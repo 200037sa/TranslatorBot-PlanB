@@ -75,7 +75,92 @@ async def list_languages(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-# 3️⃣ أمر Context Menu للترجمة كليك يمين
+# 3️⃣ أمر السلاش السريع للترجمة بالرد (/t)
+@bot.tree.command(
+    name="t", description="ترجمة الرسالة التي قمت بالرد عليها (Reply)"
+)
+@app_commands.describe(
+    target_language="رمز اللغة المراد الترجمة إليها (اختياري، الافتراضي هو لغتك الأم)"
+)
+async def quick_translate(
+    interaction: discord.Interaction, target_language: str = None
+):
+    # التأكد من أن المستخدم يرتكز على رسالة معينة عبر الرد
+    referenced_msg = interaction.message.reference if interaction.message else None
+
+    # في أوامر الـ Slash لا تتوفر reference مباشرة داخل interaction، لذا نجلب الرسالة المردود عليها من القناة
+    channel = interaction.channel
+    target_msg = None
+
+    # التحقق من آخر رسائل القناة لمعرفة الرسالة المردود عليها إن وجدت
+    if interaction.data.get("resolved", {}).get("messages"):
+        # جلب الرسالة في حال تم التمرير من الواجهة
+        target_msg = list(interaction.data["resolved"]["messages"].values())[0]
+
+    # جلب الرسالة المراد ترجمتها عبر المرجع
+    try:
+        # البحث عن الرسالة المرجعية في الشات
+        async for msg in channel.history(limit=5):
+            if msg.id == interaction.id:
+                continue
+            # إذا استجاب للرد مباشرة
+            if (
+                msg.author.id == interaction.user.id
+                and msg.reference
+                and msg.reference.message_id
+            ):
+                target_msg = await channel.fetch_message(
+                    msg.reference.message_id
+                )
+                break
+    except Exception:
+        pass
+
+    # إذا لم نجد الرد عبر الهستوري المحلي، نتحقق من أحدث رسالة قام المستخدم بالرد عليها
+    if not target_msg:
+        # محاولة جلب مرجع الرسالة المباشر من خلال جلب آخر رسالة للمستخدم
+        async for msg in channel.history(limit=10):
+            if (
+                msg.author.id == interaction.user.id
+                and msg.reference
+                and msg.reference.message_id
+            ):
+                target_msg = await channel.fetch_message(
+                    msg.reference.message_id
+                )
+                break
+
+    if not target_msg or not target_msg.content:
+        await interaction.response.send_message(
+            "⚠️ يرجى استخدام الأمر `/t` كـ **رد (Reply)** على الرسالة التي تريد ترجمتها!",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    # تحديد اللغة الهدف (إما المدخلة أو اللغة الأم)
+    if target_language:
+        final_lang = target_language.lower().strip()
+    else:
+        user_langs = load_user_languages()
+        final_lang = user_langs.get(str(interaction.user.id), "ar")
+
+    try:
+        translated_text = GoogleTranslator(
+            source="auto", target=final_lang
+        ).translate(target_msg.content)
+        response_text = (
+            f"🌐 **الترجمة إلى ({final_lang}):**\n```{translated_text}```"
+        )
+        await interaction.followup.send(response_text, ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(
+            f"❌ حدث خطأ أثناء الترجمة: {e}", ephemeral=True
+        )
+
+
+# 4️⃣ أمر Context Menu للترجمة كليك يمين
 @bot.tree.context_menu(name="Translate to My Language")
 async def translate_message(
     interaction: discord.Interaction, message: discord.Message
