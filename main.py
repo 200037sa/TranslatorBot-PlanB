@@ -6,10 +6,10 @@ from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
 
-# إعداد البوت مع تفعيل Members Intent
+# إعداد البوت
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True  # مطلوب للتعرف على انضمام الأعضاء الجدد
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -24,119 +24,204 @@ def load_user_profiles():
     return {}
 
 
-def save_user_profile(user_id, gender, age, country, language):
+def update_user_field(user_id, field, value):
     data = load_user_profiles()
-    data[str(user_id)] = {
-        "gender": gender,
-        "age": age,
-        "country": country,
-        "language": language,
-    }
+    user_str = str(user_id)
+    if user_str not in data:
+        data[user_str] = {
+            "gender": "Not Set",
+            "age": "Not Set",
+            "country": "Not Set",
+            "language": "ar",
+        }
+    data[user_str][field] = value
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-# --- نموذج الاستبيان (Modal) ---
-class SurveyModal(discord.ui.Modal, title="📋 استبيان انضمام عضو جديد"):
-    gender = discord.ui.TextInput(
-        label="النع/الجنس",
-        placeholder="ذكر / أنثى",
-        required=True,
-        max_length=10,
-    )
+# --- قائمة اختيار الجنس ---
+class GenderSelect(discord.ui.Select):
 
-    age = discord.ui.TextInput(
-        label="العمر",
-        placeholder="مثال: 22",
-        required=True,
-        max_length=3,
-    )
-
-    country = discord.ui.TextInput(
-        label="البلد",
-        placeholder="مثال: السعودية / مصر / اليمن",
-        required=True,
-        max_length=50,
-    )
-
-    language = discord.ui.TextInput(
-        label="اللغة الأساسية/المفضلة",
-        placeholder="مثال: ar أو en",
-        required=True,
-        max_length=20,
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        # حفظ البيانات عند الإرسال
-        save_user_profile(
-            user_id=interaction.user.id,
-            gender=self.gender.value.strip(),
-            age=self.age.value.strip(),
-            country=self.country.value.strip(),
-            language=self.language.value.strip().lower(),
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Male", emoji="♂️", value="Male"),
+            discord.SelectOption(label="Female", emoji="♀️", value="Female"),
+        ]
+        super().__init__(
+            placeholder="Select Gender...",
+            min_values=1,
+            max_values=1,
+            options=options,
         )
 
+    async def callback(self, interaction: discord.Interaction):
+        update_user_field(interaction.user.id, "gender", self.values[0])
         await interaction.response.send_message(
-            f"✅ شكراً لك {interaction.user.mention}! تم حفظ بياناتك بنجاح في البوت.",
-            ephemeral=True,
+            f"✅ Gender set to: **{self.values[0]}**", ephemeral=True
         )
 
 
-# --- زر فتح الاستبيان ---
+# --- قائمة اختيار العمر ---
+class AgeSelect(discord.ui.Select):
+
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="10 - 15 years", value="10-15"),
+            discord.SelectOption(label="16 - 20 years", value="16-20"),
+            discord.SelectOption(label="21 - 25 years", value="21-25"),
+            discord.SelectOption(label="26 - 30 years", value="26-30"),
+            discord.SelectOption(label="31 - 40 years", value="31-40"),
+            discord.SelectOption(label="40+ years", value="40+"),
+        ]
+        super().__init__(
+            placeholder="Select Age Range...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        update_user_field(interaction.user.id, "age", self.values[0])
+        await interaction.response.send_message(
+            f"✅ Age set to: **{self.values[0]}**", ephemeral=True
+        )
+
+
+# --- قائمة اختيار الدولة ---
+class CountrySelect(discord.ui.Select):
+
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Saudi Arabia", emoji="🇸🇦", value="Saudi Arabia"
+            ),
+            discord.SelectOption(
+                label="United Arab Emirates",
+                emoji="🇦🇪",
+                value="United Arab Emirates",
+            ),
+            discord.SelectOption(label="Egypt", emoji="🇪🇬", value="Egypt"),
+            discord.SelectOption(label="Yemen", emoji="🇾🇪", value="Yemen"),
+            discord.SelectOption(label="Iraq", emoji="🇮🇶", value="Iraq"),
+            discord.SelectOption(label="Jordan", emoji="🇯🇴", value="Jordan"),
+            discord.SelectOption(label="Morocco", emoji="🇲🇦", value="Morocco"),
+            discord.SelectOption(label="Algeria", emoji="🇩🇿", value="Algeria"),
+            discord.SelectOption(
+                label="United States", emoji="🇺🇸", value="United States"
+            ),
+            discord.SelectOption(
+                label="United Kingdom", emoji="🇬🇧", value="United Kingdom"
+            ),
+            discord.SelectOption(
+                label="Turkey", emoji="🇹🇷", value="Turkey"
+            ),
+            discord.SelectOption(label="Other / Global", emoji="🌐", value="Other"),
+        ]
+        super().__init__(
+            placeholder="Select Country...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        update_user_field(interaction.user.id, "country", self.values[0])
+        await interaction.response.send_message(
+            f"✅ Country set to: **{self.values[0]}**", ephemeral=True
+        )
+
+
+# --- قائمة اختيار اللغة المفضلة ---
+class LanguageSelect(discord.ui.Select):
+
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="Arabic (العربية)", emoji="🇸🇦", value="ar"
+            ),
+            discord.SelectOption(
+                label="English", emoji="🇺🇸", value="en"
+            ),
+            discord.SelectOption(
+                label="Spanish (Español)", emoji="🇪🇸", value="es"
+            ),
+            discord.SelectOption(
+                label="French (Français)", emoji="🇫🇷", value="fr"
+            ),
+            discord.SelectOption(
+                label="German (Deutsch)", emoji="🇩🇪", value="de"
+            ),
+            discord.SelectOption(
+                label="Turkish (Türkçe)", emoji="🇹🇷", value="tr"
+            ),
+            discord.SelectOption(
+                label="Russian (Русский)", emoji="🇷🇺", value="ru"
+            ),
+            discord.SelectOption(
+                label="Japanese (日本語)", emoji="🇯🇵", value="ja"
+            ),
+        ]
+        super().__init__(
+            placeholder="Select Preferred Language...",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        update_user_field(interaction.user.id, "language", self.values[0])
+        await interaction.response.send_message(
+            f"✅ Preferred Language set to: `{self.values[0]}`", ephemeral=True
+        )
+
+
+# --- واجهة الاستبيان الكاملة (View) ---
 class SurveyView(discord.ui.View):
 
     def __init__(self):
-        super().__init__(timeout=None)  # جعل الزر يعيش دائماً
-
-    @discord.ui.button(
-        label="تعبئة الاستبيان 📝",
-        style=discord.ButtonStyle.primary,
-        custom_id="start_survey_btn",
-    )
-    async def open_survey(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await interaction.response.send_modal(SurveyModal())
+        super().__init__(timeout=None)
+        # إضافة القوائم الأربع للواجهة
+        self.add_item(GenderSelect())
+        self.add_item(AgeSelect())
+        self.add_item(CountrySelect())
+        self.add_item(LanguageSelect())
 
 
 # --- الأحداث والبداية ---
 @bot.event
 async def on_ready():
-    bot.add_view(SurveyView())  # تسجيل الزر الدائم
+    bot.add_view(SurveyView())
     synced = await bot.tree.sync()
     print(f"تم تسجيل الدخول باسم {bot.user}، وتم مزامنة الأوامر بنجاح!")
 
 
-# الترحيب بالعضو عند انضمامه وإرسال الاستبيان له على الخاص (DM)
 @bot.event
 async def on_member_join(member: discord.Member):
     try:
         embed = discord.Embed(
-            title=f"أهلاً بك في السيرفر {member.name}! 👋",
-            description="يرجى الضغط على الزر أدناه لتعبئة استبيان الترحيب القصير وتحديد بياناتك لخدمتك بشكل أفضل.",
-            color=discord.Color.green(),
+            title="👋 Welcome / أهلاً بك!",
+            description="Please select your details from the dropdown menus below:\nيرجى اختيار بياناتك من القوائم المنسدلة أدناه:",
+            color=discord.Color.blue(),
         )
         await member.send(embed=embed, view=SurveyView())
     except discord.Forbidden:
-        # إذا كانت الرسائل الخاصة مغلقة لدى العضو
         print(f"لم نتمكن من إرسال رسالة خاصة للعضو {member.name}")
 
 
-# --- أمر يدوي لإرسال الزر في قناة الترحيب إن أردت ---
 @bot.tree.command(
     name="setup-survey",
-    description="إرسال لوحة الاستبيان في القناة الحالية (للآدمن)",
+    description="إرسال قائمة الاستبيان بالمنسدلات في القناة الحالية (للآدمن)",
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_survey(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="🌐 استبيان الأعضاء الجدد",
-        description="اضغط على الزر أدناه لتحديد جنسك، عمرك، بلدك، ولغتك المفضلة.",
+        title="📋 Welcome Survey / استبيان الترحيب",
+        description="Select your Gender, Age, Country, and Preferred Language below:\nاختر جنسك، عمرك، بلدك، ولغتك المفضلة من القوائم:",
         color=discord.Color.blue(),
     )
     await interaction.channel.send(embed=embed, view=SurveyView())
     await interaction.response.send_message(
-        "✅ تم إرسال لوحة الاستبيان بنجاح!", ephemeral=True
+        "✅ Survey panel sent successfully!", ephemeral=True
     )
 
 
@@ -147,25 +232,9 @@ async def setup_survey(interaction: discord.Interaction):
 @app_commands.describe(language_code="رمز اللغة (مثال: ar, en, es)")
 async def set_language(interaction: discord.Interaction, language_code: str):
     lang = language_code.lower().strip()
-    # تحديث اللغة في ملف البروفايلات
-    data = load_user_profiles()
-    user_id_str = str(interaction.user.id)
-
-    if user_id_str in data:
-        data[user_id_str]["language"] = lang
-    else:
-        data[user_id_str] = {
-            "gender": "غير محدد",
-            "age": "غير محدد",
-            "country": "غير محدد",
-            "language": lang,
-        }
-
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
+    update_user_field(interaction.user.id, "language", lang)
     await interaction.response.send_message(
-        f"✅ تم حفظ لغتك المفضلة إلى: `{lang}`", ephemeral=True
+        f"✅ Saved target language to: `{lang}`", ephemeral=True
     )
 
 
@@ -182,14 +251,12 @@ async def list_languages(interaction: discord.Interaction):
     languages_list = (
         "🟢 **`ar`** - Arabic (العربية)\n"
         "🟢 **`en`** - English\n"
-        "🟢 **`es`** - Spanish (Español)\n"
-        "🟢 **`fr`** - French (Français)\n"
-        "🟢 **`de`** - German (Deutsch)\n"
-        "🟢 **`tr`** - Turkish (Türkçe)\n"
-        "🟢 **`ru`** - Russian (Русский)\n"
-        "🟢 **`zh-cn`** - Chinese Simplified\n"
-        "🟢 **`ja`** - Japanese\n"
-        "🟢 **`ko`** - Korean"
+        "🟢 **`es`** - Spanish\n"
+        "🟢 **`fr`** - French\n"
+        "🟢 **`de`** - German\n"
+        "🟢 **`tr`** - Turkish\n"
+        "🟢 **`ru`** - Russian\n"
+        "🟢 **`ja`** - Japanese"
     )
     embed.add_field(
         name="Popular Language Codes", value=languages_list, inline=False
