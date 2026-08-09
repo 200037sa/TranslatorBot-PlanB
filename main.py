@@ -15,100 +15,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 DATA_FILE = "user_profiles.json"
 
-# نصوص الاستبيان المترجمة للغات الشائعة
-TRANSLATIONS = {
-    "ar": {
-        "title": "📋 استبيان الترحيب",
-        "gender_title": "اختر الجنس:",
-        "male": "ذكر",
-        "female": "أنثى",
-        "age_title": "اختر الفئة العمرية:",
-        "country_title": "اختر مكان الإقامة/المنطقة:",
-        "done": "✅ تم حفظ جميع بياناتك بنجاح! يمكنك الآن استخدام أمر الترجمة `/t` في أي وقت.",
-    },
-    "en": {
-        "title": "📋 Welcome Survey",
-        "gender_title": "Select your Gender:",
-        "male": "Male",
-        "female": "Female",
-        "age_title": "Select Age Range:",
-        "country_title": "Select Region/Country:",
-        "done": "✅ All your details have been saved! You can now use `/t` for instant translation.",
-    },
-    "es": {
-        "title": "📋 Encuesta de Bienvenida",
-        "gender_title": "Selecciona tu Género:",
-        "male": "Masculino",
-        "female": "Femenino",
-        "age_title": "Selecciona Rango de Edad:",
-        "country_title": "Selecciona Región:",
-        "done": "✅ ¡Datos guardados! Ya puedes usar `/t` para traducir.",
-    },
-    "fr": {
-        "title": "📋 Enquête d'accueil",
-        "gender_title": "Sélectionnez votre Genre:",
-        "male": "Homme",
-        "female": "Femme",
-        "age_title": "Sélectionnez la Tranche d'âge:",
-        "country_title": "Sélectionnez la Région:",
-        "done": "✅ Données enregistrées ! Vous pouvez utiliser `/t` pour traduire.",
-    },
-    "de": {
-        "title": "📋 Willkommensumfrage",
-        "gender_title": "Wähle dein Geschlecht:",
-        "male": "Männlich",
-        "female": "Weiblich",
-        "age_title": "Wähle Altersgruppe:",
-        "country_title": "Wähle Region:",
-        "done": "✅ Daten gespeichert! Du kannst jetzt `/t` zum Übersetzen nutzen.",
-    },
-    "tr": {
-        "title": "📋 Hoş Geldiniz Anketİ",
-        "gender_title": "Cinsiyetinizi Seçin:",
-        "male": "Erkek",
-        "female": "Kadın",
-        "age_title": "Yaş Aralığını Seçin:",
-        "country_title": "Bölgenizi Seçin:",
-        "done": "✅ Bilgileriniz kaydedildi! Artık çeviri için `/t` kullanabilirsiniz.",
-    },
-    "ru": {
-        "title": "📋 Приветственный опрос",
-        "gender_title": "Выберите ваш пол:",
-        "male": "Мужской",
-        "female": "Женский",
-        "age_title": "Выберите возраст:",
-        "country_title": "Выберите регион:",
-        "done": "✅ Данные сохранены! Теперь вы можете использовать `/t` для перевода.",
-    },
-    "zh-cn": {
-        "title": "📋 欢迎调查",
-        "gender_title": "选择你的性别：",
-        "male": "男",
-        "female": "女",
-        "age_title": "选择年龄段：",
-        "country_title": "选择地区：",
-        "done": "✅ 数据已保存！您现在可以使用 `/t` 进行即时翻译。",
-    },
-    "ja": {
-        "title": "📋 ウェルカムアンケート",
-        "gender_title": "性別を選択してください：",
-        "male": "男性",
-        "female": "女性",
-        "age_title": "年齢層を選択してください：",
-        "country_title": "地域を選択してください：",
-        "done": "✅ 設定が保存されました！`/t` で翻訳機能を利用できます。",
-    },
-    "ko": {
-        "title": "📋 환영 설문조사",
-        "gender_title": "성별을 선택하세요:",
-        "male": "남성",
-        "female": "여성",
-        "age_title": "연령대를 선택하세요:",
-        "country_title": "지역을 선택하세요:",
-        "done": "✅ 정보가 저장되었습니다! 이제 `/t` 명령어로 번역할 수 있습니다.",
-    },
-}
-
 
 # --- إدارة البيانات ---
 def load_user_profiles():
@@ -133,203 +39,398 @@ def update_user_field(user_id, field, value):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-# --- 2️⃣ أزرار المرحلة الثانية: البيانات المترجمة ---
-class ProfileSurveyView(discord.ui.View):
+# --- نصوص الاستبيان المترجمة للغات متعددة ---
+TRANSLATIONS = {
+    "ar": {
+        "title": "📋 استبيان الأعضاء الجدد",
+        "gender_ph": "اختر الجنس...",
+        "gender_m": "ذكر",
+        "gender_f": "أنثى",
+        "age_ph": "اختر الفئة العمرية...",
+        "country_ph": "اختر بلدك...",
+        "saved": "✅ تم حفظ بياناتك ولغتك المفضلة بنجاح!",
+    },
+    "en": {
+        "title": "📋 New Member Survey",
+        "gender_ph": "Select Gender...",
+        "gender_m": "Male",
+        "gender_f": "Female",
+        "age_ph": "Select Age Range...",
+        "country_ph": "Select Country...",
+        "saved": "✅ Your profile and language preference have been saved!",
+    },
+    "es": {
+        "title": "📋 Encuesta de Nuevo Miembro",
+        "gender_ph": "Seleccionar Género...",
+        "gender_m": "Masculino",
+        "gender_f": "Femenino",
+        "age_ph": "Seleccionar Rango de Edad...",
+        "country_ph": "Seleccionar País...",
+        "saved": "✅ ¡Tu perfil y preferencia de idioma se han guardado!",
+    },
+    "fr": {
+        "title": "📋 Sondage Nouvel Membre",
+        "gender_ph": "Sélectionner le genre...",
+        "gender_m": "Homme",
+        "gender_f": "Femme",
+        "age_ph": "Sélectionner la tranche d'âge...",
+        "country_ph": "Sélectionner le pays...",
+        "saved": "✅ Votre profil et langue préférée ont été enregistrés!",
+    },
+    "de": {
+        "title": "📋 Umfrage für neue Mitglieder",
+        "gender_ph": "Geschlecht auswählen...",
+        "gender_m": "Männlich",
+        "gender_f": "Weiblich",
+        "age_ph": "Altersgruppe auswählen...",
+        "country_ph": "Land auswählen...",
+        "saved": "✅ Profil und Spracheinstellungen erfolgreich gespeichert!",
+    },
+    "tr": {
+        "title": "📋 Yeni Üye Anketi",
+        "gender_ph": "Cinsiyet Seçin...",
+        "gender_m": "Erkek",
+        "gender_f": "Kadın",
+        "age_ph": "Yaş Aralığı Seçin...",
+        "country_ph": "Ülke Seçin...",
+        "saved": "✅ Profiliniz ve dil tercihiniz başarıyla kaydedildi!",
+    },
+    "ru": {
+        "title": "📋 Опрос нового участника",
+        "gender_ph": "Выберите пол...",
+        "gender_m": "Мужской",
+        "gender_f": "Женский",
+        "age_ph": "Выберите возраст...",
+        "country_ph": "Выберите страну...",
+        "saved": "✅ Ваш профиль и языковые настройки сохранены!",
+    },
+    "zh-cn": {
+        "title": "📋 新成员调查",
+        "gender_ph": "选择性别...",
+        "gender_m": "男",
+        "gender_f": "女",
+        "age_ph": "选择年龄段...",
+        "country_ph": "选择国家...",
+        "saved": "✅ 您的个人资料和语言偏好已保存！",
+    },
+    "ja": {
+        "title": "📋 新規メンバーアンケート",
+        "gender_ph": "性別を選択...",
+        "gender_m": "男性",
+        "gender_f": "女性",
+        "age_ph": "年齢層を選択...",
+        "country_ph": "国を選択...",
+        "saved": "✅ プロフィールと言語設定が保存されました！",
+    },
+    "ko": {
+        "title": "📋 신규 회원 설문조사",
+        "gender_ph": "성별 선택...",
+        "gender_m": "남성",
+        "gender_f": "여성",
+        "age_ph": "연령대 선택...",
+        "country_ph": "국가 선택...",
+        "saved": "✅ 프로필 및 언어 설정이 저장되었습니다!",
+    },
+}
 
-    def __init__(self, lang_code: str):
-        super().__init__(timeout=None)
-        self.lang = lang_code if lang_code in TRANSLATIONS else "en"
-        self.texts = TRANSLATIONS[self.lang]
-        self.selected_gender = None
-        self.selected_age = None
-        self.selected_country = None
 
-        # إضافة أزرار الجنس
-        self.add_item(
-            SurveyButton(
-                label=self.texts["male"],
-                emoji="♂️",
-                category="gender",
-                value="Male",
-            )
-        )
-        self.add_item(
-            SurveyButton(
-                label=self.texts["female"],
-                emoji="♀️",
-                category="gender",
-                value="Female",
-            )
-        )
+# --- قوائم الاستبيان بعد اختيار اللغة ---
+class GenderSelect(discord.ui.Select):
 
-        # إضافة أزرار العمر
-        for age_range in ["10-17", "18-24", "25-34", "35+"]:
-            self.add_item(
-                SurveyButton(
-                    label=age_range, category="age", value=age_range
-                )
-            )
-
-        # إضافة أزرار المناطق
-        regions = [
-            ("🇸🇦 Middle East / 🗺️", "Middle East"),
-            ("🇪🇺 Europe", "Europe"),
-            ("🇺🇸 Americas", "Americas"),
-            ("🌏 Asia / Global", "Asia/Global"),
+    def __init__(self, lang):
+        t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+        options = [
+            discord.SelectOption(label=t["gender_m"], emoji="♂️", value="Male"),
+            discord.SelectOption(
+                label=t["gender_f"], emoji="♀️", value="Female"
+            ),
         ]
-        for label, val in regions:
-            self.add_item(
-                SurveyButton(label=label, category="country", value=val)
-            )
-
-
-class SurveyButton(discord.ui.Button):
-
-    def __init__(
-        self,
-        label: str,
-        category: str,
-        value: str,
-        emoji: str = None,
-    ):
         super().__init__(
-            label=label,
-            emoji=emoji,
-            style=discord.ButtonStyle.secondary,
+            placeholder=t["gender_ph"],
+            min_values=1,
+            max_values=1,
+            options=options,
         )
-        self.category = category
-        self.value = value
 
     async def callback(self, interaction: discord.Interaction):
-        update_user_field(interaction.user.id, self.category, self.value)
-        self.style = discord.ButtonStyle.success  # تغيير لون الزر المختار للأخضر
+        update_user_field(interaction.user.id, "gender", self.values[0])
+        await interaction.response.send_message("✅ Gender Saved!", ephemeral=True)
+
+
+class AgeSelect(discord.ui.Select):
+
+    def __init__(self, lang):
+        t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+        options = [
+            discord.SelectOption(label="10 - 15", value="10-15"),
+            discord.SelectOption(label="16 - 20", value="16-20"),
+            discord.SelectOption(label="21 - 25", value="21-25"),
+            discord.SelectOption(label="26 - 30", value="26-30"),
+            discord.SelectOption(label="31 - 40", value="31-40"),
+            discord.SelectOption(label="40+", value="40+"),
+        ]
+        super().__init__(
+            placeholder=t["age_ph"],
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        update_user_field(interaction.user.id, "age", self.values[0])
+        await interaction.response.send_message("✅ Age Saved!", ephemeral=True)
+
+
+class CountrySelect(discord.ui.Select):
+
+    def __init__(self, lang):
+        t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+        options = [
+            discord.SelectOption(
+                label="Saudi Arabia", emoji="🇸🇦", value="Saudi Arabia"
+            ),
+            discord.SelectOption(
+                label="United Arab Emirates", emoji="🇦🇪", value="UAE"
+            ),
+            discord.SelectOption(label="Egypt", emoji="🇪🇬", value="Egypt"),
+            discord.SelectOption(label="Yemen", emoji="🇾🇪", value="Yemen"),
+            discord.SelectOption(label="Iraq", emoji="🇮🇶", value="Iraq"),
+            discord.SelectOption(
+                label="United States", emoji="🇺🇸", value="USA"
+            ),
+            discord.SelectOption(
+                label="United Kingdom", emoji="🇬🇧", value="UK"
+            ),
+            discord.SelectOption(label="Turkey", emoji="🇹🇷", value="Turkey"),
+            discord.SelectOption(
+                label="Other / Global", emoji="🌐", value="Other"
+            ),
+        ]
+        super().__init__(
+            placeholder=t["country_ph"],
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        update_user_field(interaction.user.id, "country", self.values[0])
         await interaction.response.send_message(
-            f"✅ Saved: **{self.value}**", ephemeral=True
+            "✅ Country Saved!", ephemeral=True
         )
 
 
-# --- 1️⃣ أزرار المرحلة الأولى: اختيار 10 لغات شائعة ---
-class LanguageSelectionView(discord.ui.View):
+class DetailsSurveyView(discord.ui.View):
+
+    def __init__(self, lang):
+        super().__init__(timeout=None)
+        self.add_item(GenderSelect(lang))
+        self.add_item(AgeSelect(lang))
+        self.add_item(CountrySelect(lang))
+
+
+# --- واجهة اختيار اللغة عبر 10 أزرار ---
+class LanguageButtonView(discord.ui.View):
 
     def __init__(self):
         super().__init__(timeout=None)
 
-        languages = [
-            ("العربية", "🇸🇦", "ar"),
-            ("English", "🇺🇸", "en"),
-            ("Español", "🇪🇸", "es"),
-            ("Français", "🇫🇷", "fr"),
-            ("Deutsch", "🇩🇪", "de"),
-            ("Türkçe", "🇹🇷", "tr"),
-            ("Русский", "🇷🇺", "ru"),
-            ("简体中文", "🇨🇳", "zh-cn"),
-            ("日本語", "🇯🇵", "ja"),
-            ("한국어", "🇰🇷", "ko"),
-        ]
+    async def handle_lang_click(
+        self, interaction: discord.Interaction, lang_code: str
+    ):
+        # 1. حفظ اللغة فوراً لتستخدم في الترجمة
+        update_user_field(interaction.user.id, "language", lang_code)
 
-        for label, emoji, code in languages:
-            self.add_item(LanguageButton(label=label, emoji=emoji, code=code))
-
-
-class LanguageButton(discord.ui.Button):
-
-    def __init__(self, label: str, emoji: str, code: str):
-        super().__init__(
-            label=label, emoji=emoji, style=discord.ButtonStyle.primary
-        )
-        self.code = code
-
-    async def callback(self, interaction: discord.Interaction):
-        # 1. حفظ اللغة فوراً لتفعيل الترجمة المباشرة
-        update_user_field(interaction.user.id, "language", self.code)
-
-        # 2. جلب النصوص المترجمة للغة المختارة
-        lang_texts = TRANSLATIONS.get(self.code, TRANSLATIONS["en"])
-
+        # 2. إظهار استبيان التفاصيل بلغة العضو
+        t = TRANSLATIONS.get(lang_code, TRANSLATIONS["en"])
         embed = discord.Embed(
-            title=lang_texts["title"],
-            description=(
-                f"🌐 Language saved to: **{self.code}**\n\n"
-                f"**1. {lang_texts['gender_title']}**\n"
-                f"**2. {lang_texts['age_title']}**\n"
-                f"**3. {lang_texts['country_title']}**"
-            ),
+            title=t["title"],
+            description="Complete your details below / أكمل بياناتك أدناه:",
             color=discord.Color.green(),
         )
-
-        # 3. فتح المرحلة الثانية بالأزرار المترجمة
         await interaction.response.send_message(
-            embed=embed,
-            view=ProfileSurveyView(self.code),
-            ephemeral=True,
+            embed=embed, view=DetailsSurveyView(lang_code), ephemeral=True
         )
+
+    @discord.ui.button(
+        label="العربية",
+        emoji="🇸🇦",
+        style=discord.ButtonStyle.primary,
+        custom_id="btn_ar",
+    )
+    async def btn_ar(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "ar")
+
+    @discord.ui.button(
+        label="English",
+        emoji="🇺🇸",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_en",
+    )
+    async def btn_en(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "en")
+
+    @discord.ui.button(
+        label="Español",
+        emoji="🇪🇸",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_es",
+    )
+    async def btn_es(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "es")
+
+    @discord.ui.button(
+        label="Français",
+        emoji="🇫🇷",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_fr",
+    )
+    async def btn_fr(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "fr")
+
+    @discord.ui.button(
+        label="Deutsch",
+        emoji="🇩🇪",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_de",
+    )
+    async def btn_de(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "de")
+
+    @discord.ui.button(
+        label="Türkçe",
+        emoji="🇹🇷",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_tr",
+    )
+    async def btn_tr(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "tr")
+
+    @discord.ui.button(
+        label="Русский",
+        emoji="🇷🇺",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_ru",
+    )
+    async def btn_ru(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "ru")
+
+    @discord.ui.button(
+        label="中文",
+        emoji="🇨🇳",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_zh",
+    )
+    async def btn_zh(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "zh-cn")
+
+    @discord.ui.button(
+        label="日本語",
+        emoji="🇯🇵",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_ja",
+    )
+    async def btn_ja(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "ja")
+
+    @discord.ui.button(
+        label="한국어",
+        emoji="🇰🇷",
+        style=discord.ButtonStyle.secondary,
+        custom_id="btn_ko",
+    )
+    async def btn_ko(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await self.handle_lang_click(interaction, "ko")
 
 
 # --- الأحداث والبداية ---
 @bot.event
 async def on_ready():
-    bot.add_view(LanguageSelectionView())
+    bot.add_view(LanguageButtonView())
     synced = await bot.tree.sync()
     print(f"تم تسجيل الدخول باسم {bot.user}، وتم مزامنة الأوامر بنجاح!")
 
 
+# الترحيب بالعضو عند انضمامه (إرسال في الخاص أولاً، وإذا تعذر يُرسل تنبيه)
 @bot.event
 async def on_member_join(member: discord.Member):
+    embed = discord.Embed(
+        title="🌐 Choose Your Language / اختر لغتك",
+        description="Select your preferred language to start the survey & enable instant translation!\nاختر لغتك المفضلة لبدء الاستبيان وتفعيل الترجمة الفورية!",
+        color=discord.Color.blue(),
+    )
     try:
-        embed = discord.Embed(
-            title="🌐 Choose Your Language / اختر لغتك",
-            description="Please select your preferred language below to start the survey & enable instant translations:\nاختر لغتك المفضلة من الأزرار أدناه للبدء وتفعيل الترجمة الفورية:",
-            color=discord.Color.blue(),
-        )
-        await member.send(embed=embed, view=LanguageSelectionView())
+        await member.send(embed=embed, view=LanguageButtonView())
     except discord.Forbidden:
         print(f"لم نتمكن من إرسال رسالة خاصة للعضو {member.name}")
 
 
+# 🟢 أمر /survey للأعضاء (يحاول الإرسال في الخاص أولاً، وإن فشل يعرضه خفي في الشات نفسه)
 @bot.tree.command(
     name="survey",
-    description="عرض استبيان اللغة والبيانات الشخصية بالرسائل الخاصة (DM)",
+    description="اختر لغتك المفضلة وأكمل الاستبيان لتفعيل الترجمة الفورية",
 )
 async def user_request_survey(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🌐 Choose Your Language / اختر لغتك",
-        description="Select your language to customize your survey & enable instant translation:\nاختر لغتك لتخصيص الاستبيان وتفعيل الترجمة الفورية:",
+        description="Select your preferred language to start the survey & enable instant translation!\nاختر لغتك المفضلة لبدء الاستبيان وتفعيل الترجمة الفورية!",
         color=discord.Color.blue(),
     )
     try:
-        await interaction.user.send(embed=embed, view=LanguageSelectionView())
+        await interaction.user.send(embed=embed, view=LanguageButtonView())
         await interaction.response.send_message(
-            "📬 تم إرسال الاستبيان لك في الخاصة (DM)!", ephemeral=True
+            "📬 تم إرسال قائمة اللغات في الرسائل الخاصة (DM)!", ephemeral=True
         )
     except discord.Forbidden:
+        # إذا كانت الرسائل الخاصة مغلقة، يظهر الاستبيان فوراً في الشات للعضو فقط
         await interaction.response.send_message(
-            "❌ تعذّر الإرسال، يرجى فتح الرسائل الخاصة (DMs) في إعدادات الحساب.",
-            ephemeral=True,
+            embed=embed, view=LanguageButtonView(), ephemeral=True
         )
 
 
+# --- أمر الأدمن لتثبيت اللوحة في قناة الترحيب ---
 @bot.tree.command(
-    name="setup-survey", description="إرسال لوحة اللغات في القناة (للآدمن)"
+    name="setup-survey", description="إرسال لوحة اختيار اللغة في القناة (للآدمن)"
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_survey(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🌐 Choose Your Language / اختر لغتك المفضلة",
-        description="Click your language button to get started & activate `/t` translation:\nاضغط على زر لغتك للبدء وتفعيل الترجمة الفورية:",
+        description="Click your language button below to set up your profile and enable instant translation!\nاضغط على زر لغتك بالأسفل لضبط حسابك وتفعيل الترجمة الفورية!",
         color=discord.Color.blue(),
     )
-    await interaction.channel.send(embed=embed, view=LanguageSelectionView())
+    await interaction.channel.send(embed=embed, view=LanguageButtonView())
     await interaction.response.send_message(
-        "✅ Survey panel sent!", ephemeral=True
+        "✅ Language selection buttons sent successfully!", ephemeral=True
     )
 
 
-# --- أمر الترجمة السريع (/t) ---
+# --- أمر الترجمة بالرد (/t) ---
 @bot.tree.command(
     name="t", description="ترجمة الرسالة التي قمت بالرد عليها (Reply)"
 )
 @app_commands.describe(
-    target_language="رمز اللغة المراد الترجمة إليها (اختياري، الافتراضي لغتك المحفوظة)"
+    target_language="رمز اللغة المراد الترجمة إليها (اختياري)"
 )
 async def quick_translate(
     interaction: discord.Interaction, target_language: str = None
@@ -356,7 +457,7 @@ async def quick_translate(
 
     if not target_msg or not target_msg.content:
         await interaction.response.send_message(
-            "⚠️ يرجى استخدام الأمر `/t` كـ **رد (Reply)** على الرسالة المراد ترجمتها!",
+            "⚠️ يرجى استخدام الأمر `/t` كـ **رد (Reply)** على الرسالة التي تريد ترجمتها!",
             ephemeral=True,
         )
         return
@@ -374,24 +475,24 @@ async def quick_translate(
         translated_text = GoogleTranslator(
             source="auto", target=final_lang
         ).translate(target_msg.content)
-        await interaction.followup.send(
-            f"🌐 **الترجمة إلى ({final_lang}):**\n```{translated_text}```",
-            ephemeral=True,
+        response_text = (
+            f"🌐 **الترجمة إلى ({final_lang}):**\n```{translated_text}```"
         )
+        await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
         await interaction.followup.send(
             f"❌ حدث خطأ أثناء الترجمة: {e}", ephemeral=True
         )
 
 
-# --- أمر الترجمة بـ Click Right ---
+# --- أمر الترجمة بـ "كليك يمين" ---
 @bot.tree.context_menu(name="Translate to My Language")
 async def translate_message(
     interaction: discord.Interaction, message: discord.Message
 ):
     if not message.content:
         await interaction.response.send_message(
-            "⚠️ لا يوجد نص لترجمته.", ephemeral=True
+            "⚠️ هذه الرسالة لا تحتوي على نص لترجمته.", ephemeral=True
         )
         return
 
@@ -404,20 +505,21 @@ async def translate_message(
         translated_text = GoogleTranslator(
             source="auto", target=target_lang
         ).translate(message.content)
-        await interaction.followup.send(
-            f"🌐 **الترجمة إلى ({target_lang}):**\n```{translated_text}```",
-            ephemeral=True,
+        response_text = (
+            f"🌐 **الترجمة إلى ({target_lang}):**\n```{translated_text}```"
         )
+        await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
         await interaction.followup.send(
             f"❌ حدث خطأ أثناء الترجمة: {e}", ephemeral=True
         )
 
 
+# تشغيل خادم إبقاء البوت حياً
 keep_alive()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN:
     bot.run(TOKEN)
 else:
-    print("❌ خطأ: لم يتم العثور على DISCORD_TOKEN!")
+    print("❌ خطأ: لم يتم العثور على DISCORD_TOKEN في متغيرات البيئة!")
