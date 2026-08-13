@@ -297,11 +297,15 @@ class AgeSelect(discord.ui.Select):
         selected_age = self.values[0]
         update_user_field(interaction.user.id, "age", selected_age)
 
-        await assign_profile_role(interaction, AGE_ROLES, selected_age)
+        # تحديد لون رتبة العمر (بنفسجي)
+        role_color = discord.Color.from_rgb(155, 89, 182)  # #9B59B6
+
+        await assign_profile_role(
+            interaction, AGE_ROLES, selected_age, role_color
+        )
         await interaction.response.send_message(
             f"✅ Saved! Age Range Role added: {selected_age}", ephemeral=True
         )
-
 
 class CountrySelect(discord.ui.Select):
 
@@ -324,11 +328,15 @@ class CountrySelect(discord.ui.Select):
         selected_country = self.values[0]
         update_user_field(interaction.user.id, "country", selected_country)
 
-        await assign_profile_role(interaction, COUNTRY_ROLES, selected_country)
+        # تحديد لون رتبة الدولة (أخضر زمردي)
+        role_color = discord.Color.from_rgb(46, 204, 113)  # #2ECC71
+
+        await assign_profile_role(
+            interaction, COUNTRY_ROLES, selected_country, role_color
+        )
         await interaction.response.send_message(
             f"✅ Saved! Flag Role added: {selected_country}", ephemeral=True
         )
-
 
 class DetailsSurveyView(discord.ui.View):
 
