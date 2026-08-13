@@ -204,8 +204,8 @@ TRANSLATIONS = {
     },
 }
 
-# --- قوائم الخيارات لغرض التتبع الموحد للرتب ---
-GENDER_ROLES = ["♂️", "♀️"]
+# --- قوائم الخيارات لغرض التتبع الموحد للرتب (باستخدام الصيغ النصية للإيموجي كما طلبت) ---
+GENDER_ROLES = [":male_sign:", ":female_sign:"]
 
 AGE_ROLES = [
     "10 - 15",
@@ -216,31 +216,30 @@ AGE_ROLES = [
     "40+",
 ]
 
-# قائمة البلدان بالرموز والتعبيرات
+# قائمة البلدان: القيمة والاسم للرتبة بنفس صيغة النص :flag_xx:، والإيموجي للعرض بالقائمة فقط
 COUNTRY_OPTIONS = [
-    {"label": "اليمن / Yemen", "emoji": "🇾🇪", "value": "🇾🇪"},
-    {"label": "السعودية / KSA", "emoji": "🇸🇦", "value": "🇸🇦"},
-    {"label": "مصر / Egypt", "emoji": "🇪🇬", "value": "🇪🇬"},
-    {"label": "الجزائر / Algeria", "emoji": "🇩🇿", "value": "🇩🇿"},
-    {"label": "فلسطين / Palestine", "emoji": "🇵🇸", "value": "🇵🇸"},
-    {"label": "الإمارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
-    {"label": "العراق / Iraq", "emoji": "🇮🇶", "value": "🇮🇶"},
-    {"label": "المغرب / Morocco", "emoji": "🇲🇦", "value": "🇲🇦"},
-    {"label": "تونس / Tunisia", "emoji": "🇹🇳", "value": "🇹🇳"},
-    {"label": "الأردن / Jordan", "emoji": "🇯🇴", "value": "🇯🇴"},
-    {"label": "أمريكا / USA", "emoji": "🇺🇸", "value": "🇺🇸"},
-    {"label": "إسبانيا / Spain", "emoji": "🇪🇸", "value": "🇪🇸"},
-    {"label": "تركيا / Turkey", "emoji": "🇹🇷", "value": "🇹🇷"},
-    {"label": "كوريا / Korea", "emoji": "🇰🇷", "value": "🇰🇷"},
-    {"label": "اليابان / Japan", "emoji": "🇯🇵", "value": "🇯🇵"},
-    {"label": "ألمانيا / Germany", "emoji": "🇩🇪", "value": "🇩🇪"},
-    {"label": "فرنسا / France", "emoji": "🇫🇷", "value": "🇫🇷"},
-    {"label": "المملكة المتحدة / UK", "emoji": "🇬🇧", "value": "🇬🇧"},
-    {"label": "روسيا / Russia", "emoji": "🇷🇺", "value": "🇷🇺"},
-    {"label": "الصين / China", "emoji": "🇨🇳", "value": "🇨🇳"},
-    {"label": "دولة أخرى / Other", "emoji": "🌐", "value": "🌐"},
+    {"label": "اليمن / Yemen", "emoji": "🇾🇪", "value": ":flag_ye:"},
+    {"label": "السعودية / KSA", "emoji": "🇸🇦", "value": ":flag_sa:"},
+    {"label": "مصر / Egypt", "emoji": "🇪🇬", "value": ":flag_eg:"},
+    {"label": "الجزائر / Algeria", "emoji": "🇩🇿", "value": ":flag_dz:"},
+    {"label": "فلسطين / Palestine", "emoji": "🇵🇸", "value": ":flag_ps:"},
+    {"label": "الإمارات / UAE", "emoji": "🇦🇪", "value": ":flag_ae:"},
+    {"label": "العراق / Iraq", "emoji": "🇮🇶", "value": ":flag_iq:"},
+    {"label": "المغرب / Morocco", "emoji": "🇲🇦", "value": ":flag_ma:"},
+    {"label": "تونس / Tunisia", "emoji": "🇹🇳", "value": ":flag_tn:"},
+    {"label": "الأردن / Jordan", "emoji": "🇯🇴", "value": ":flag_jo:"},
+    {"label": "أمريكا / USA", "emoji": "🇺🇸", "value": ":flag_us:"},
+    {"label": "إسبانيا / Spain", "emoji": "🇪🇸", "value": ":flag_es:"},
+    {"label": "تركيا / Turkey", "emoji": "🇹🇷", "value": ":flag_tr:"},
+    {"label": "كوريا / Korea", "emoji": "🇰🇷", "value": ":flag_kr:"},
+    {"label": "اليابان / Japan", "emoji": "🇯🇵", "value": ":flag_jp:"},
+    {"label": "ألمانيا / Germany", "emoji": "🇩🇪", "value": ":flag_de:"},
+    {"label": "فرنسا / France", "emoji": "🇫🇷", "value": ":flag_fr:"},
+    {"label": "المملكة المتحدة / UK", "emoji": "🇬🇧", "value": ":flag_gb:"},
+    {"label": "روسيا / Russia", "emoji": "🇷🇺", "value": ":flag_ru:"},
+    {"label": "الصين / China", "emoji": "🇨🇳", "value": ":flag_cn:"},
+    {"label": "دولة أخرى / Other", "emoji": "🌐", "value": ":globe_with_meridians:"},
 ]
-
 COUNTRY_ROLES = [c["value"] for c in COUNTRY_OPTIONS]
 
 
@@ -250,8 +249,12 @@ class GenderSelect(discord.ui.Select):
     def __init__(self, lang):
         t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
         options = [
-            discord.SelectOption(label=t["gender_m"], emoji="♂️", value="♂️"),
-            discord.SelectOption(label=t["gender_f"], emoji="♀️", value="♀️"),
+            discord.SelectOption(
+                label=t["gender_m"], emoji="♂️", value=":male_sign:"
+            ),
+            discord.SelectOption(
+                label=t["gender_f"], emoji="♀️", value=":female_sign:"
+            ),
         ]
         super().__init__(
             placeholder=t["gender_ph"],
@@ -261,13 +264,13 @@ class GenderSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        selected_gender = self.values[0]
+        selected_gender = self.values[0]  # سيرجع :male_sign: أو :female_sign:
         update_user_field(interaction.user.id, "gender", selected_gender)
 
         # تحديد لون الرتبة: أزرق للذكر ووردي للبنت
         role_color = (
             discord.Color.blue()
-            if selected_gender == "♂️"
+            if selected_gender == ":male_sign:"
             else discord.Color.from_rgb(233, 30, 99)
         )
 
@@ -297,7 +300,12 @@ class AgeSelect(discord.ui.Select):
         selected_age = self.values[0]
         update_user_field(interaction.user.id, "age", selected_age)
 
-        await assign_profile_role(interaction, AGE_ROLES, selected_age)
+        # تحديد لون رتبة العمر (بنفسجي #9B59B6)
+        role_color = discord.Color.from_rgb(155, 89, 182)
+
+        await assign_profile_role(
+            interaction, AGE_ROLES, selected_age, role_color
+        )
         await interaction.response.send_message(
             f"✅ Saved! Age Range Role added: {selected_age}", ephemeral=True
         )
@@ -321,14 +329,18 @@ class CountrySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        selected_country = self.values[0]
+        selected_country = self.values[0]  # سيرجع مثل :flag_ye:
         update_user_field(interaction.user.id, "country", selected_country)
 
-        await assign_profile_role(interaction, COUNTRY_ROLES, selected_country)
+        # تحديد لون رتبة الدولة (أخضر زمردي #2ECC71)
+        role_color = discord.Color.from_rgb(46, 204, 113)
+
+        await assign_profile_role(
+            interaction, COUNTRY_ROLES, selected_country, role_color
+        )
         await interaction.response.send_message(
             f"✅ Saved! Flag Role added: {selected_country}", ephemeral=True
         )
-
 
 class DetailsSurveyView(discord.ui.View):
 
