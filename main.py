@@ -109,7 +109,7 @@ async def assign_profile_role(
             print(
                 "❌ البوت لا يملك صلاحية إضافة الرتب للعضو (تأكد من أن رتبة البوت أعلى من الرتب المراد منحها)."
             )
-
+            
 # --- نصوص الاستبيان المترجمة للغات متعددة ---
 TRANSLATIONS = {
     "ar": {
@@ -205,7 +205,7 @@ TRANSLATIONS = {
 }
 
 # --- قوائم الخيارات لغرض التتبع الموحد للرتب ---
-GENDER_ROLES = [":male_sign:", ":female_sign:"]
+GENDER_ROLES = ["♂️", "♀️"]
 
 AGE_ROLES = [
     "10 - 15",
@@ -218,28 +218,29 @@ AGE_ROLES = [
 
 # قائمة البلدان بالرموز والتعبيرات
 COUNTRY_OPTIONS = [
-    {"label": "اليمن / Yemen", "emoji": ":flag_ye:", "value": "🇾🇪"},
-    {"label": "السعودية / KSA", "emoji": ":flag_sa:", "value": "🇸🇦"},
-    {"label": "مصر / Egypt", "emoji": ":flag_eg:", "value": "🇪🇬"},
-    {"label": "الجزائر / Algeria", "emoji": ":flag_dz:", "value": "🇩🇿"},
-    {"label": "فلسطين / Palestine", "emoji": ":flag_ps:", "value": "🇵🇸"},
-    {"label": "الإمارات / UAE", "emoji": ":flag_ae:", "value": "🇦🇪"},
-    {"label": "العراق / Iraq", "emoji": ":flag_iq:", "value": "🇮🇶"},
-    {"label": "المغرب / Morocco", "emoji": ":flag_ma:", "value": "🇲🇦"},
-    {"label": "تونس / Tunisia", "emoji": ":flag_tn:", "value": "🇹🇳"},
-    {"label": "الأردن / Jordan", "emoji": ":flag_jo:", "value": "🇯🇴"},
-    {"label": "أمريكا / USA", "emoji": ":flag_us:", "value": "🇺🇸"},
-    {"label": "إسبانيا / Spain", "emoji": ":flag_es:", "value": "🇪🇸"},
-    {"label": "تركيا / Turkey", "emoji": ":flag_tr:", "value": "🇹🇷"},
-    {"label": "كوريا / Korea", "emoji": ":flag_kr:", "value": "🇰🇷"},
-    {"label": "اليابان / Japan", "emoji": ":flag_jp:", "value": "🇯🇵"},
-    {"label": "ألمانيا / Germany", "emoji": ":flag_de:", "value": "🇩🇪"},
-    {"label": "فرنسا / France", "emoji": ":flag_fr:", "value": "🇫🇷"},
-    {"label": "المملكة المتحدة / UK", "emoji": ":flag_gb:", "value": "🇬🇧"},
-    {"label": "روسيا / Russia", "emoji": ":flag_ru:", "value": "🇷🇺"},
-    {"label": "الصين / China", "emoji": ":flag_cn:", "value": "🇨🇳"},
+    {"label": "اليمن / Yemen", "emoji": "🇾🇪", "value": "🇾🇪"},
+    {"label": "السعودية / KSA", "emoji": "🇸🇦", "value": "🇸🇦"},
+    {"label": "مصر / Egypt", "emoji": "🇪🇬", "value": "🇪🇬"},
+    {"label": "الجزائر / Algeria", "emoji": "🇩🇿", "value": "🇩🇿"},
+    {"label": "فلسطين / Palestine", "emoji": "🇵🇸", "value": "🇵🇸"},
+    {"label": "الإمارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
+    {"label": "العراق / Iraq", "emoji": "🇮🇶", "value": "🇮🇶"},
+    {"label": "المغرب / Morocco", "emoji": "🇲🇦", "value": "🇲🇦"},
+    {"label": "تونس / Tunisia", "emoji": "🇹🇳", "value": "🇹🇳"},
+    {"label": "الأردن / Jordan", "emoji": "🇯🇴", "value": "🇯🇴"},
+    {"label": "أمريكا / USA", "emoji": "🇺🇸", "value": "🇺🇸"},
+    {"label": "إسبانيا / Spain", "emoji": "🇪🇸", "value": "🇪🇸"},
+    {"label": "تركيا / Turkey", "emoji": "🇹🇷", "value": "🇹🇷"},
+    {"label": "كوريا / Korea", "emoji": "🇰🇷", "value": "🇰🇷"},
+    {"label": "اليابان / Japan", "emoji": "🇯🇵", "value": "🇯🇵"},
+    {"label": "ألمانيا / Germany", "emoji": "🇩🇪", "value": "🇩🇪"},
+    {"label": "فرنسا / France", "emoji": "🇫🇷", "value": "🇫🇷"},
+    {"label": "المملكة المتحدة / UK", "emoji": "🇬🇧", "value": "🇬🇧"},
+    {"label": "روسيا / Russia", "emoji": "🇷🇺", "value": "🇷🇺"},
+    {"label": "الصين / China", "emoji": "🇨🇳", "value": "🇨🇳"},
     {"label": "دولة أخرى / Other", "emoji": "🌐", "value": "🌐"},
 ]
+
 COUNTRY_ROLES = [c["value"] for c in COUNTRY_OPTIONS]
 
 
@@ -296,15 +297,11 @@ class AgeSelect(discord.ui.Select):
         selected_age = self.values[0]
         update_user_field(interaction.user.id, "age", selected_age)
 
-        # تحديد لون رتبة العمر (بنفسجي)
-        role_color = discord.Color.from_rgb(155, 89, 182)  # #9B59B6
-
-        await assign_profile_role(
-            interaction, AGE_ROLES, selected_age, role_color
-        )
+        await assign_profile_role(interaction, AGE_ROLES, selected_age)
         await interaction.response.send_message(
             f"✅ Saved! Age Range Role added: {selected_age}", ephemeral=True
         )
+
 
 class CountrySelect(discord.ui.Select):
 
@@ -327,15 +324,11 @@ class CountrySelect(discord.ui.Select):
         selected_country = self.values[0]
         update_user_field(interaction.user.id, "country", selected_country)
 
-        # تحديد لون رتبة الدولة (أخضر زمردي)
-        role_color = discord.Color.from_rgb(46, 204, 113)  # #2ECC71
-
-        await assign_profile_role(
-            interaction, COUNTRY_ROLES, selected_country, role_color
-        )
+        await assign_profile_role(interaction, COUNTRY_ROLES, selected_country)
         await interaction.response.send_message(
             f"✅ Saved! Flag Role added: {selected_country}", ephemeral=True
         )
+
 
 class DetailsSurveyView(discord.ui.View):
 
