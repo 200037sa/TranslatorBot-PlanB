@@ -46,16 +46,29 @@ async def assign_profile_role(
     selected_role_name: str,
     role_color: discord.Color = discord.Color.default(),
 ):
-    """تضيف الرتبة المختارة للمستخدم وتزيل بقية الرتب التابعة لنفس الفئة (مثل تغيير البلد أو الجنس)."""
+    """تضيف الرتبة المختارة للمستخدم وتزيل بقية الرتب التابعة لنفس الفئة."""
     guild = interaction.guild
+
+    # إذا جرى التفاعل في الخاص (DM) نلتقط السيرفر الأول الذي يجمع البوت بالعضو
     if not guild:
-        return  # في حال كان التفاعل في الخاص (DM) لا يمكن إضافة رتب
+        for g in interaction.client.guilds:
+            member_in_g = g.get_member(interaction.user.id)
+            if member_in_g:
+                guild = g
+                break
+
+    if not guild:
+        print(
+            f"❌ لم يتم العثور على سيرفر مشترك للعضو {interaction.user.name} لإسناد الرتبة."
+        )
+        return
 
     member = guild.get_member(interaction.user.id)
     if not member:
         try:
             member = await guild.fetch_member(interaction.user.id)
-        except Exception:
+        except Exception as e:
+            print(f"❌ تعذر جلب العضو من السيرفر: {e}")
             return
 
     # 1. إزالة أي رتبة سابقة للمستخدم تنتمي لهذه الفئة
@@ -68,7 +81,9 @@ async def assign_profile_role(
         try:
             await member.remove_roles(*roles_to_remove)
         except discord.Forbidden:
-            print("❌ البوت لا يملك صلاحية Manage Roles لإزالة الرتب القديمة.")
+            print(
+                "❌ البوت لا يملك صلاحية Manage Roles لإزالة الرتب القديمة (تأكد من ترتيب رتبة البوت أعلى باقي الرتب!)."
+            )
 
     # 2. البحث عن الرتبة المطلوبة أو إنشاؤها إن لم تكن موجودة
     target_role = discord.utils.get(guild.roles, name=selected_role_name)
@@ -87,10 +102,14 @@ async def assign_profile_role(
     if target_role not in member.roles:
         try:
             await member.add_roles(target_role)
+            print(
+                f"✅ تم إسناد الرتبة {selected_role_name} للعضو {member.display_name} بنجاح!"
+            )
         except discord.Forbidden:
-            print("❌ البوت لا يملك صلاحية إضافة الرتب للعضو.")
-
-
+            print(
+                "❌ البوت لا يملك صلاحية إضافة الرتب للعضو (تأكد من أن رتبة البوت أعلى من الرتب المراد منحها)."
+            )
+            
 # --- نصوص الاستبيان المترجمة للغات متعددة ---
 TRANSLATIONS = {
     "ar": {
