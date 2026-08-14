@@ -3,3 +3,4 @@ deep-translator
 Flask
 waitress
 pymongo
+motor

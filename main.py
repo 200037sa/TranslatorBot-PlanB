@@ -5,37 +5,43 @@ from deep_translator import GoogleTranslator
 from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
-from pymongo import MongoClient
+import motor.motor_asyncio  # استخدام motor بدلاً من pymongo للـ Async
 
 # =========================================================
-# الاتصال بقاعدة بيانات MongoDB Atlas
+# الاتصال بقاعدة بيانات MongoDB Atlas بشكل أزامني (Async)
 # =========================================================
 MONGO_URI = os.getenv("MONGO_URI")
 if not MONGO_URI:
     print("⚠️ تحذير: لم يتم العثور على MONGO_URI في متغيرات البيئة!")
 
-mongo_client = MongoClient(MONGO_URI)
+mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = mongo_client["bot_database"]
 users_col = db["user_profiles"]
 
 
-# --- إدارة البيانات باستخدام MongoDB ---
-def load_user_profiles():
-    profiles = {}
-    for doc in users_col.find():
-        user_id = doc["_id"]
-        profiles[user_id] = {
-            "gender": doc.get("gender", "Not Set"),
-            "age": doc.get("age", "Not Set"),
-            "country": doc.get("country", "Not Set"),
-            "language": doc.get("language", "en"),
-        }
-    return profiles
-
-
-def update_user_field(user_id, field, value):
+# --- إدارة البيانات باستخدام Async MongoDB ---
+async def load_user_profile(user_id):
+    """جلب بيانات مستخدم واحد فقط لتقليل الضغط والتأخير"""
     user_str = str(user_id)
-    users_col.update_one(
+    doc = await users_col.find_one({"_id": user_str})
+    if not doc:
+        return {
+            "gender": "Not Set",
+            "age": "Not Set",
+            "country": "Not Set",
+            "language": "en",
+        }
+    return {
+        "gender": doc.get("gender", "Not Set"),
+        "age": doc.get("age", "Not Set"),
+        "country": doc.get("country", "Not Set"),
+        "language": doc.get("language", "en"),
+    }
+
+
+async def update_user_field(user_id, field, value):
+    user_str = str(user_id)
+    await users_col.update_one(
         {"_id": user_str},
         {"$set": {field: value}},
         upsert=True
@@ -265,22 +271,21 @@ class GenderSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         selected_gender = self.values[0]
-        update_user_field(interaction.user.id, "gender", selected_gender)
+        await update_user_field(interaction.user.id, "gender", selected_gender)
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS["en"])
 
         role_color = (
             discord.Color.blue()
             if selected_gender == "♂️"
-            else discord.Color.pink()  # وردي أنثوي ناعم (Soft Pink)
+            else discord.Color.pink()
         )
 
         await assign_profile_role(
             interaction, GENDER_ROLES, selected_gender, role_color
         )
-        await interaction.response.send_message(
-            t["saved_gender"], ephemeral=True
-        )
+        await interaction.followup.send(t["saved_gender"], ephemeral=True)
 
 
 class AgeSelect(discord.ui.Select):
@@ -299,8 +304,9 @@ class AgeSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         selected_age = self.values[0]
-        update_user_field(interaction.user.id, "age", selected_age)
+        await update_user_field(interaction.user.id, "age", selected_age)
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS["en"])
 
         role_color = discord.Color.from_rgb(155, 89, 182)
@@ -308,7 +314,7 @@ class AgeSelect(discord.ui.Select):
         await assign_profile_role(
             interaction, AGE_ROLES, selected_age, role_color
         )
-        await interaction.response.send_message(t["saved_age"], ephemeral=True)
+        await interaction.followup.send(t["saved_age"], ephemeral=True)
 
 
 class CountrySelect(discord.ui.Select):
@@ -330,8 +336,9 @@ class CountrySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         selected_country = self.values[0]
-        update_user_field(interaction.user.id, "country", selected_country)
+        await update_user_field(interaction.user.id, "country", selected_country)
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS["en"])
 
         role_color = discord.Color.from_rgb(46, 204, 113)
@@ -339,9 +346,7 @@ class CountrySelect(discord.ui.Select):
         await assign_profile_role(
             interaction, COUNTRY_ROLES, selected_country, role_color
         )
-        await interaction.response.send_message(
-            t["saved_country"], ephemeral=True
-        )
+        await interaction.followup.send(t["saved_country"], ephemeral=True)
 
 
 class DetailsSurveyView(discord.ui.View):
@@ -362,14 +367,15 @@ class LanguageButtonView(discord.ui.View):
     async def handle_lang_click(
         self, interaction: discord.Interaction, lang_code: str
     ):
-        update_user_field(interaction.user.id, "language", lang_code)
+        await interaction.response.defer(ephemeral=True)
+        await update_user_field(interaction.user.id, "language", lang_code)
         t = TRANSLATIONS.get(lang_code, TRANSLATIONS["en"])
         embed = discord.Embed(
             title=t["title"],
             description="Fill your profile options below:",
             color=discord.Color.green(),
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed, view=DetailsSurveyView(lang_code), ephemeral=True
         )
 
@@ -475,10 +481,14 @@ class ProfileManageView(discord.ui.View):
 # --- الأحداث والبداية ---
 @bot.event
 async def on_ready():
-    await bot.load_extension("games")
+    try:
+        await bot.load_extension("games")
+    except Exception as e:
+        print(f"⚠️ لم يتم تحميل إضافة الألعاب: {e}")
+
     bot.add_view(LanguageButtonView())
     synced = await bot.tree.sync()
-    print(f"تم تسجيل الدخول باسم {bot.user}، وتم مزامنة الأوامر بنجاح!")
+    print(f"تم تسجيل الدخول باسم {bot.user}، وتم مزامنة الأوامر بنجاح ({len(synced)} أمر)!")
 
 
 @bot.event
@@ -499,16 +509,10 @@ async def on_member_join(member: discord.Member):
     name="profile", description="عرض وتعديل بيانات ملفك الشخصي ولغتك المفضلة"
 )
 async def view_profile(interaction: discord.Interaction):
-    profiles = load_user_profiles()
-    user_data = profiles.get(
-        str(interaction.user.id),
-        {
-            "gender": "Not Set",
-            "age": "Not Set",
-            "country": "Not Set",
-            "language": "en",
-        },
-    )
+    await interaction.response.defer(ephemeral=True)
+
+    # جلب بيانات العضو الحالي فقط secara Async
+    user_data = await load_user_profile(interaction.user.id)
 
     lang = user_data.get("language", "en")
     t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
@@ -542,7 +546,7 @@ async def view_profile(interaction: discord.Interaction):
         inline=True,
     )
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         embed=embed, view=ProfileManageView(lang), ephemeral=True
     )
 
@@ -566,19 +570,14 @@ async def user_request_survey(interaction: discord.Interaction):
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_survey(interaction: discord.Interaction):
-    # تأجير الرد فوراً لتجنب انتهاء مهلة الـ Interaction
     await interaction.response.defer(ephemeral=True)
-    
+
     embed = discord.Embed(
         title="🌐 Choose Your Language / اختر لغتك المفضلة",
         description="Click your language button below to set up your profile and enable instant translation!",
         color=discord.Color.blue(),
     )
-    
-    # إرسال الرسالة الرئيسية في القناة
     await interaction.channel.send(embed=embed, view=LanguageButtonView())
-    
-    # الرد التأكيدي باستخدام followup بعد الـ defer
     await interaction.followup.send(
         "✅ Language selection buttons sent successfully!", ephemeral=True
     )
@@ -626,8 +625,7 @@ async def quick_translate(
     if target_language:
         final_lang = target_language.lower().strip()
     else:
-        profiles = load_user_profiles()
-        user_info = profiles.get(str(interaction.user.id), {})
+        user_info = await load_user_profile(interaction.user.id)
         final_lang = user_info.get("language", "en")
 
     try:
@@ -656,8 +654,7 @@ async def translate_message(
         return
 
     await interaction.response.defer(ephemeral=True)
-    profiles = load_user_profiles()
-    user_info = profiles.get(str(interaction.user.id), {})
+    user_info = await load_user_profile(interaction.user.id)
     target_lang = user_info.get("language", "en")
 
     try:
