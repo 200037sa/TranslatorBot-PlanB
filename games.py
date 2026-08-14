@@ -10,71 +10,129 @@ GAMES_CHANNEL_ID = 1537829034065403925  # استبدل هذا الرقم بـ ID
 DATA_FILE = "user_profiles.json"
 
 
-def get_user_lang(interaction: discord.Interaction) -> str:
-    """جلب اللغة إما من ملف البيانات الخاص بالبوات أو من لغة تطبيق ديسكورد للمستخدم مباشرة"""
-    user_id = str(interaction.user.id)
+# --- دالة جلب لغة المستخدم من ملف البيانات ---
+def get_user_lang(user_id: int) -> str:
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if user_id in data and "language" in data[user_id]:
-                    return data[user_id]["language"]
+                return data.get(str(user_id), {}).get("language", "ar")
         except Exception:
             pass
-
-    # إذا لم توجد في الملف، نأخذ لغة تطبيق ديسكورد الخاص به
-    locale = str(interaction.locale).split("-")[0]
-    return locale if locale in GAME_TRANSLATIONS else "ar"
+    return "ar"
 
 
-GAME_TRANSLATIONS = {
+# --- قاموس النصوص والكلمات المترجمة ---
+TEXTS = {
     "ar": {
+        "xo_title": "🎮 لعبة إكس أوه",
+        "rps_title": "🎮 لعبة حجرة ورقة مقص",
+        "c4_title": "🎮 لعبة أربع تربح",
+        "turn": "الدور",
+        "pick_move": "اختر حركتك",
+        "winner": "الفائز",
+        "loser": "الخاسر",
+        "draw": "تعادل",
+        "result": "النتيجة",
         "cant_challenge_self": "❌ لا يمكنك تحدي نفسك أو البوتات!",
-        "not_your_turn": "⚠️ ليس دورك الآن! انتظر خصمك.",
+        "not_your_turn": "⚠️ ليس دورك الآن!",
         "not_a_player": "⚠️ أنت لست جزءاً من هذه اللعبة!",
-        "win": "🎉 فاز {winner}!",
-        "draw": "🤝 تعادل!",
-        "c4_full": "⚠️ هذا العمود مكتمل، اختر عموداً آخر!",
+        "c4_full": "⚠️ هذا العمود مكتمل!",
+        "win_msg": "🎉 مبروك! لقد فزت في اللعبة!",
+        "lose_msg": "💔 للأسف! لقد خسرت اللعبة.",
+        "draw_msg": "🤝 انتهت اللعبة بالتعادل!",
     },
     "en": {
+        "xo_title": "🎮 Tic-Tac-Toe",
+        "rps_title": "🎮 Rock Paper Scissors",
+        "c4_title": "🎮 Connect Four",
+        "turn": "Turn",
+        "pick_move": "Pick your move",
+        "winner": "Winner",
+        "loser": "Loser",
+        "draw": "Draw",
+        "result": "Result",
         "cant_challenge_self": "❌ You cannot challenge yourself or a bot!",
-        "not_your_turn": "⚠️ It's not your turn! Wait for your opponent.",
+        "not_your_turn": "⚠️ It's not your turn!",
         "not_a_player": "⚠️ You are not part of this game!",
-        "win": "🎉 {winner} won!",
-        "draw": "🤝 It's a draw!",
-        "c4_full": "⚠️ This column is full, pick another one!",
+        "c4_full": "⚠️ This column is full!",
+        "win_msg": "🎉 Congratulations! You won!",
+        "lose_msg": "💔 Defeat! You lost the game.",
+        "draw_msg": "🤝 The game ended in a draw!",
     },
     "es": {
+        "xo_title": "🎮 Tres en Raya",
+        "rps_title": "🎮 Piedra Papel Tijeras",
+        "c4_title": "🎮 Conecta Cuatro",
+        "turn": "Turno",
+        "pick_move": "Elige tu movimiento",
+        "winner": "Ganador",
+        "loser": "Perdedor",
+        "draw": "Empate",
+        "result": "Resultado",
         "cant_challenge_self": "❌ ¡No puedes desafiarte a ti mismo ni a un bot!",
-        "not_your_turn": "⚠️ ¡No es tu turno! Espera a tu oponente.",
+        "not_your_turn": "⚠️ ¡No es tu turno!",
         "not_a_player": "⚠️ ¡No eres parte de este juego!",
-        "win": "🎉 ¡{winner} ha ganado!",
-        "draw": "🤝 ¡Empate!",
-        "c4_full": "⚠️ ¡Esta columna está llena, elige otra!",
+        "c4_full": "⚠️ ¡Esta columna está llena!",
+        "win_msg": "🎉 ¡Felicidades! ¡Ganaste!",
+        "lose_msg": "💔 ¡Derrota! Perdiste el juego.",
+        "draw_msg": "🤝 ¡El juego terminó en empate!",
     },
     "ja": {
+        "xo_title": "🎮 ○×ゲーム",
+        "rps_title": "🎮 じゃんけん",
+        "c4_title": "🎮 コネクトフォー",
+        "turn": "手番",
+        "pick_move": "手を選んでください",
+        "winner": "勝者",
+        "loser": "敗者",
+        "draw": "引き分け",
+        "result": "結果",
         "cant_challenge_self": "❌ 自分自身やボットに挑戦することはできません！",
-        "not_your_turn": "⚠️ あなたの番ではありません！相手を待ってください。",
+        "not_your_turn": "⚠️ あなたの番ではありません！",
         "not_a_player": "⚠️ あなたはこのゲームに参加していません！",
-        "win": "🎉 {winner} の勝利！",
-        "draw": "🤝 引き分け！",
-        "c4_full": "⚠️ この列はいっぱいです。別の列を選んでください！",
+        "c4_full": "⚠️ この列はいっぱいです！",
+        "win_msg": "🎉 おめでとうございます！あなたの勝ちです！",
+        "lose_msg": "💔 残念！あなたの負けです。",
+        "draw_msg": "🤝 引き分けで終了しました！",
     },
     "ko": {
+        "xo_title": "🎮 틱택토",
+        "rps_title": "🎮 가위바위보",
+        "c4_title": "🎮 커넥트 포",
+        "turn": "차례",
+        "pick_move": "수를 선택하세요",
+        "winner": "승자",
+        "loser": "패자",
+        "draw": "무승부",
+        "result": "결과",
         "cant_challenge_self": "❌ 자신이나 봇에게 도전할 수 없습니다!",
-        "not_your_turn": "⚠️ 당신의 차례가 아닙니다! 상대방을 기다리세요.",
+        "not_your_turn": "⚠️ 당신의 차례가 아닙니다!",
         "not_a_player": "⚠️ 이 게임의 참가자가 아닙니다!",
-        "win": "🎉 {winner} 님의 승리!",
-        "draw": "🤝 비겼습니다!",
-        "c4_full": "⚠️ 이 열은 가득 찼습니다. 다른 열을 선택하세요!",
+        "c4_full": "⚠️ 이 열은 가득 찼습니다!",
+        "win_msg": "🎉 축하합니다! 승리했습니다!",
+        "lose_msg": "💔 패배했습니다!",
+        "draw_msg": "🤝 무승부로 끝났습니다!",
     },
 }
 
 
-def t_game(interaction: discord.Interaction, key: str, **kwargs) -> str:
-    lang = get_user_lang(interaction)
-    text = GAME_TRANSLATIONS.get(lang, GAME_TRANSLATIONS["ar"]).get(key, "")
-    return text.format(**kwargs) if kwargs else text
+# --- دالة جلب النص المفصل بلغة اللاعبين الاثنين ---
+def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
+    lang1 = get_user_lang(p1_id)
+    lang2 = get_user_lang(p2_id)
+
+    t1 = TEXTS.get(lang1, TEXTS["ar"]).get(key, "")
+    t2 = TEXTS.get(lang2, TEXTS["en"]).get(key, "")
+
+    if lang1 == lang2 or t1 == t2:
+        return t1
+    return f"{t1} / {t2}"
+
+
+def get_single_text(user_id: int, key: str) -> str:
+    lang = get_user_lang(user_id)
+    return TEXTS.get(lang, TEXTS["ar"]).get(key, "")
 
 
 # ==========================================
@@ -94,13 +152,15 @@ class TicTacToeButton(discord.ui.Button):
 
         if interaction.user not in (view.player1, view.player2):
             await interaction.response.send_message(
-                t_game(interaction, "not_a_player"), ephemeral=True
+                get_single_text(interaction.user.id, "not_a_player"),
+                ephemeral=True,
             )
             return
 
         if interaction.user != view.current_player:
             await interaction.response.send_message(
-                t_game(interaction, "not_your_turn"), ephemeral=True
+                get_single_text(interaction.user.id, "not_your_turn"),
+                ephemeral=True,
             )
             return
 
@@ -121,23 +181,60 @@ class TicTacToeButton(discord.ui.Button):
         self.disabled = True
 
         winner = view.check_winner()
+        title = get_bi_text(
+            view.player1.id, view.player2.id, "xo_title"
+        )
+
         if winner:
             for child in view.children:
                 child.disabled = True
-            content = f"🎮 **Tic-Tac-Toe**\n🏆 {t_game(interaction, 'win', winner=winner.mention)}"
+            loser = view.player2 if winner == view.player1 else view.player1
+            w_label = get_bi_text(
+                view.player1.id, view.player2.id, "winner"
+            )
+
+            content = f"{title}\n\n🏆 **{w_label}:** {winner.mention}"
             await interaction.response.edit_message(content=content, view=view)
+
+            # إرسال إشعار فوز وخسارة مرة واحدة فقط في النهاية
+            await interaction.followup.send(
+                get_single_text(winner.id, "win_msg"), ephemeral=True
+            )
+            await interaction.followup.send(
+                get_single_text(loser.id, "lose_msg"), ephemeral=True
+            )
             view.stop()
 
         elif view.is_full():
             for child in view.children:
                 child.disabled = True
-            content = f"🎮 **Tic-Tac-Toe**\n🤝 {t_game(interaction, 'draw')}"
+            res_label = get_bi_text(
+                view.player1.id, view.player2.id, "result"
+            )
+            draw_label = get_bi_text(
+                view.player1.id, view.player2.id, "draw"
+            )
+
+            content = f"{title}\n\n🤝 **{res_label}:** {draw_label}"
             await interaction.response.edit_message(content=content, view=view)
+
+            await interaction.followup.send(
+                get_single_text(view.player1.id, "draw_msg"),
+                ephemeral=True,
+            )
+            await interaction.followup.send(
+                get_single_text(view.player2.id, "draw_msg"),
+                ephemeral=True,
+            )
             view.stop()
 
         else:
             view.current_player = next_player
-            content = f"🎮 **Tic-Tac-Toe**\n❌ {view.player1.mention} VS ⭕ {view.player2.mention}\n👉 **Turn / الدور:** {next_player.mention}"
+            turn_label = get_bi_text(
+                view.player1.id, view.player2.id, "turn"
+            )
+
+            content = f"{title}\n❌ {view.player1.mention} VS ⭕ {view.player2.mention}\n👉 **{turn_label}:** {next_player.mention}"
             await interaction.response.edit_message(content=content, view=view)
 
 
@@ -207,46 +304,69 @@ class RPSView(discord.ui.View):
     async def make_choice(self, interaction: discord.Interaction, choice: str):
         if interaction.user not in (self.player1, self.player2):
             await interaction.response.send_message(
-                t_game(interaction, "not_a_player"), ephemeral=True
+                get_single_text(interaction.user.id, "not_a_player"),
+                ephemeral=True,
             )
             return
 
         self.choices[interaction.user.id] = choice
+        # عدم إرسال إشعار خيار محفوظ لمنع الامتلاء، والاعتماد على إخفاء التفاعل
+        await interaction.response.defer()
 
-        if len(self.choices) == 1:
-            # تحديث الرسالة الأصلية نفسها بدلاً من إضافة إشعار جديد
-            waiting_user = (
-                self.player2
-                if interaction.user == self.player1
-                else self.player1
-            )
-            await interaction.response.edit_message(
-                content=f"🎮 **Rock Paper Scissors**\n{self.player1.mention} VS {self.player2.mention}\n\n⏳ **Waiting for / في انتظار:** {waiting_user.mention}",
-                view=self,
-            )
-
-        elif len(self.choices) == 2:
+        if len(self.choices) == 2:
             c1 = self.choices[self.player1.id]
             c2 = self.choices[self.player2.id]
+
             emoji_map = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
 
             for child in self.children:
                 child.disabled = True
 
-            summary = f"🎮 **Rock Paper Scissors**\n{self.player1.mention} ({emoji_map[c1]}) VS {self.player2.mention} ({emoji_map[c2]})\n\n"
+            title = get_bi_text(
+                self.player1.id, self.player2.id, "rps_title"
+            )
+            summary = f"{title}\n{self.player1.mention} ({emoji_map[c1]}) VS {self.player2.mention} ({emoji_map[c2]})\n\n"
 
             if c1 == c2:
-                summary += f"🤝 {t_game(interaction, 'draw')}"
-            elif (
-                (c1 == "rock" and c2 == "scissors")
-                or (c1 == "paper" and c2 == "rock")
-                or (c1 == "scissors" and c2 == "paper")
-            ):
-                summary += f"🏆 {t_game(interaction, 'win', winner=self.player1.mention)}"
+                res_label = get_bi_text(
+                    self.player1.id, self.player2.id, "result"
+                )
+                draw_label = get_bi_text(
+                    self.player1.id, self.player2.id, "draw"
+                )
+                summary += f"🤝 **{res_label}:** {draw_label}"
+                await interaction.followup.send(
+                    get_single_text(self.player1.id, "draw_msg"),
+                    ephemeral=True,
+                )
+                await interaction.followup.send(
+                    get_single_text(self.player2.id, "draw_msg"),
+                    ephemeral=True,
+                )
             else:
-                summary += f"🏆 {t_game(interaction, 'win', winner=self.player2.mention)}"
+                winner = (
+                    self.player1
+                    if (c1 == "rock" and c2 == "scissors")
+                    or (c1 == "paper" and c2 == "rock")
+                    or (c1 == "scissors" and c2 == "paper")
+                    else self.player2
+                )
+                loser = (
+                    self.player2 if winner == self.player1 else self.player1
+                )
+                w_label = get_bi_text(
+                    self.player1.id, self.player2.id, "winner"
+                )
 
-            await interaction.response.edit_message(content=summary, view=self)
+                summary += f"🏆 **{w_label}:** {winner.mention}"
+                await interaction.followup.send(
+                    get_single_text(winner.id, "win_msg"), ephemeral=True
+                )
+                await interaction.followup.send(
+                    get_single_text(loser.id, "lose_msg"), ephemeral=True
+                )
+
+            await interaction.message.edit(content=summary, view=self)
 
 
 # ==========================================
@@ -279,13 +399,15 @@ class ConnectFourView(discord.ui.View):
 
             if interaction.user not in (view.player1, view.player2):
                 await interaction.response.send_message(
-                    t_game(interaction, "not_a_player"), ephemeral=True
+                    get_single_text(interaction.user.id, "not_a_player"),
+                    ephemeral=True,
                 )
                 return
 
             if interaction.user != view.current_player:
                 await interaction.response.send_message(
-                    t_game(interaction, "not_your_turn"), ephemeral=True
+                    get_single_text(interaction.user.id, "not_your_turn"),
+                    ephemeral=True,
                 )
                 return
 
@@ -297,27 +419,62 @@ class ConnectFourView(discord.ui.View):
 
             if row_to_place == -1:
                 await interaction.response.send_message(
-                    t_game(interaction, "c4_full"), ephemeral=True
+                    get_single_text(interaction.user.id, "c4_full"),
+                    ephemeral=True,
                 )
                 return
 
             piece = 1 if view.current_player == view.player1 else 2
             view.board[row_to_place][self.col] = piece
+            title = get_bi_text(
+                view.player1.id, view.player2.id, "c4_title"
+            )
 
             if view.check_win(piece):
                 for child in view.children:
                     child.disabled = True
-                msg = f"{view.render_board()}\n\n🏆 {t_game(interaction, 'win', winner=view.current_player.mention)}"
+                loser = (
+                    view.player2
+                    if view.current_player == view.player1
+                    else view.player1
+                )
+                w_label = get_bi_text(
+                    view.player1.id, view.player2.id, "winner"
+                )
+
+                msg = f"{title}\n{view.render_board()}\n\n🏆 **{w_label}:** {view.current_player.mention}"
                 await interaction.response.edit_message(content=msg, view=view)
+
+                await interaction.followup.send(
+                    get_single_text(view.current_player.id, "win_msg"),
+                    ephemeral=True,
+                )
+                await interaction.followup.send(
+                    get_single_text(loser.id, "lose_msg"), ephemeral=True
+                )
                 view.stop()
 
             elif all(view.board[0][c] != 0 for c in range(7)):
                 for child in view.children:
                     child.disabled = True
-                msg = (
-                    f"{view.render_board()}\n\n🤝 {t_game(interaction, 'draw')}"
+                res_label = get_bi_text(
+                    view.player1.id, view.player2.id, "result"
                 )
+                draw_label = get_bi_text(
+                    view.player1.id, view.player2.id, "draw"
+                )
+
+                msg = f"{title}\n{view.render_board()}\n\n🤝 **{res_label}:** {draw_label}"
                 await interaction.response.edit_message(content=msg, view=view)
+
+                await interaction.followup.send(
+                    get_single_text(view.player1.id, "draw_msg"),
+                    ephemeral=True,
+                )
+                await interaction.followup.send(
+                    get_single_text(view.player2.id, "draw_msg"),
+                    ephemeral=True,
+                )
                 view.stop()
 
             else:
@@ -326,7 +483,11 @@ class ConnectFourView(discord.ui.View):
                     if view.current_player == view.player1
                     else view.player1
                 )
-                msg = f"{view.render_board()}\n\n🔴 {view.player1.mention} VS 🟡 {view.player2.mention}\n👉 **Turn / الدور:** {view.current_player.mention}"
+                turn_label = get_bi_text(
+                    view.player1.id, view.player2.id, "turn"
+                )
+
+                msg = f"{title}\n{view.render_board()}\n\n🔴 {view.player1.mention} VS 🟡 {view.player2.mention}\n👉 **{turn_label}:** {view.current_player.mention}"
                 await interaction.response.edit_message(content=msg, view=view)
 
     def render_board(self) -> str:
@@ -371,6 +532,7 @@ class GamesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    # --- أمر XO ---
     @app_commands.command(
         name="xo", description="Start a Tic-Tac-Toe game / بدء لعبة إكس أوه"
     )
@@ -382,14 +544,23 @@ class GamesCog(commands.Cog):
 
         if opponent.bot or opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                t_game(interaction, "cant_challenge_self"), ephemeral=True
+                get_single_text(interaction.user.id, "cant_challenge_self"),
+                ephemeral=True,
             )
             return
 
         view = TicTacToeView(interaction.user, opponent)
-        msg = f"🎮 **Tic-Tac-Toe**\n❌ {interaction.user.mention} VS ⭕ {opponent.mention}\n👉 **Turn / الدور:** {interaction.user.mention}"
+        title = get_bi_text(
+            interaction.user.id, opponent.id, "xo_title"
+        )
+        turn_label = get_bi_text(
+            interaction.user.id, opponent.id, "turn"
+        )
+
+        msg = f"{title}\n❌ {interaction.user.mention} VS ⭕ {opponent.mention}\n👉 **{turn_label}:** {interaction.user.mention}"
         await interaction.response.send_message(msg, view=view)
 
+    # --- أمر حجرة ورقة مقص ---
     @app_commands.command(
         name="rps",
         description="Start Rock Paper Scissors / بدء لعبة حجرة ورقة مقص",
@@ -402,14 +573,23 @@ class GamesCog(commands.Cog):
 
         if opponent.bot or opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                t_game(interaction, "cant_challenge_self"), ephemeral=True
+                get_single_text(interaction.user.id, "cant_challenge_self"),
+                ephemeral=True,
             )
             return
 
         view = RPSView(interaction.user, opponent)
-        msg = f"🎮 **Rock Paper Scissors**\n{interaction.user.mention} VS {opponent.mention}\n\n👇 Pick your move / اختر حركتك:"
+        title = get_bi_text(
+            interaction.user.id, opponent.id, "rps_title"
+        )
+        pick_label = get_bi_text(
+            interaction.user.id, opponent.id, "pick_move"
+        )
+
+        msg = f"{title}\n{interaction.user.mention} VS {opponent.mention}\n\n👇 **{pick_label}:**"
         await interaction.response.send_message(msg, view=view)
 
+    # --- أمر أربع تربح ---
     @app_commands.command(
         name="connect4",
         description="Start a Connect Four game / بدء لعبة أربع تربح",
@@ -422,12 +602,20 @@ class GamesCog(commands.Cog):
 
         if opponent.bot or opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                t_game(interaction, "cant_challenge_self"), ephemeral=True
+                get_single_text(interaction.user.id, "cant_challenge_self"),
+                ephemeral=True,
             )
             return
 
         view = ConnectFourView(interaction.user, opponent)
-        msg = f"{view.render_board()}\n\n🔴 {interaction.user.mention} VS 🟡 {opponent.mention}\n👉 **Turn / الدور:** {interaction.user.mention}"
+        title = get_bi_text(
+            interaction.user.id, opponent.id, "c4_title"
+        )
+        turn_label = get_bi_text(
+            interaction.user.id, opponent.id, "turn"
+        )
+
+        msg = f"{title}\n{view.render_board()}\n\n🔴 {interaction.user.mention} VS 🟡 {opponent.mention}\n👉 **{turn_label}:** {interaction.user.mention}"
         await interaction.response.send_message(msg, view=view)
 
 
