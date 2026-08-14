@@ -14,7 +14,7 @@ DATA_FILE = "user_profiles.json"
 
 
 # =========================================================
-# جلب لغة المستخدم
+# جلب لغة المستخدم (اللغة الافتراضية: الإنجليزية)
 # =========================================================
 
 def get_user_lang(user_id: int) -> str:
@@ -40,19 +40,6 @@ def get_user_lang(user_id: int) -> str:
 
 TEXTS = {
 
-    "ar": {
-        # عناوين الألعاب
-        "xo_title": "إكس أوه",
-        "rps_title": "حجرة ورقة مقص",
-        "c4_title": "أربع تربح",
-
-        # الحالات
-        "turn": "الدور",
-        "winner": "الفائز",
-        "loser": "الخاسر",
-        "draw": "تعادل",
-    },
-
     "en": {
         "xo_title": "Tic-Tac-Toe",
         "rps_title": "Rock Paper Scissors",
@@ -62,6 +49,17 @@ TEXTS = {
         "winner": "Winner",
         "loser": "Loser",
         "draw": "Draw",
+    },
+
+    "ar": {
+        "xo_title": "إكس أوه",
+        "rps_title": "حجرة ورقة مقص",
+        "c4_title": "أربع تربح",
+
+        "turn": "الدور",
+        "winner": "الفائز",
+        "loser": "الخاسر",
+        "draw": "تعادل",
     },
 
     "es": {
@@ -101,12 +99,7 @@ TEXTS = {
 
 # =========================================================
 # نص ثنائي اللغة حسب لغتي اللاعبين
-#
-# إذا كانت اللغة نفسها:
-#     Tic-Tac-Toe
-#
-# إذا اختلفت:
-#     إكس أوه / Tic-Tac-Toe
+# الافتراضي عند عدم العثور على النص هو الإنجليزية
 # =========================================================
 
 def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
@@ -114,7 +107,7 @@ def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
     lang1 = get_user_lang(p1_id)
     lang2 = get_user_lang(p2_id)
 
-    text1 = TEXTS.get(lang1, TEXTS["ar"]).get(key, "")
+    text1 = TEXTS.get(lang1, TEXTS["en"]).get(key, "")
     text2 = TEXTS.get(lang2, TEXTS["en"]).get(key, "")
 
     if lang1 == lang2:
@@ -146,36 +139,17 @@ class TicTacToeButton(discord.ui.Button):
 
         view: TicTacToeView = self.view
 
-        # -----------------------------------------
-        # أي شخص خارج اللعبة:
-        # لا رسالة، فقط إخفاء التفاعل
-        # -----------------------------------------
-
         if interaction.user not in (view.player1, view.player2):
             await interaction.response.defer()
             return
-
-        # -----------------------------------------
-        # ليس دوره:
-        # لا رسالة
-        # -----------------------------------------
 
         if interaction.user != view.current_player:
             await interaction.response.defer()
             return
 
-        # -----------------------------------------
-        # الخانة مستخدمة:
-        # لا رسالة
-        # -----------------------------------------
-
         if view.board[self.y][self.x] != 0:
             await interaction.response.defer()
             return
-
-        # -----------------------------------------
-        # تسجيل الحركة
-        # -----------------------------------------
 
         if view.current_player == view.player1:
 
@@ -197,19 +171,11 @@ class TicTacToeButton(discord.ui.Button):
 
         self.disabled = True
 
-        # -----------------------------------------
-        # العنوان
-        # -----------------------------------------
-
         title = get_bi_text(
             view.player1.id,
             view.player2.id,
             "xo_title"
         )
-
-        # -----------------------------------------
-        # فوز
-        # -----------------------------------------
 
         winner = view.check_winner()
 
@@ -264,10 +230,6 @@ class TicTacToeButton(discord.ui.Button):
             view.stop()
             return
 
-        # -----------------------------------------
-        # تعادل
-        # -----------------------------------------
-
         if view.is_full():
 
             for child in view.children:
@@ -293,10 +255,6 @@ class TicTacToeButton(discord.ui.Button):
 
             view.stop()
             return
-
-        # -----------------------------------------
-        # الانتقال للاعب التالي
-        # -----------------------------------------
 
         view.current_player = next_player
 
@@ -410,7 +368,6 @@ class RPSView(discord.ui.View):
         self.player1 = player1
         self.player2 = player2
 
-        # اختيارات اللاعبين مخفية
         self.choices = {}
 
     @discord.ui.button(
@@ -464,10 +421,6 @@ class RPSView(discord.ui.View):
         choice: str
     ):
 
-        # -----------------------------------------
-        # شخص خارج اللعبة
-        # -----------------------------------------
-
         if interaction.user not in (
             self.player1,
             self.player2
@@ -476,39 +429,17 @@ class RPSView(discord.ui.View):
             await interaction.response.defer()
             return
 
-        # -----------------------------------------
-        # اللاعب اختار بالفعل
-        # لا نرسل أي شيء
-        # -----------------------------------------
-
         if interaction.user.id in self.choices:
 
             await interaction.response.defer()
             return
 
-        # -----------------------------------------
-        # حفظ الاختيار
-        #
-        # لا نعدل الرسالة هنا.
-        #
-        # لذلك لن يعرف أي لاعب ماذا اختار الآخر.
-        # -----------------------------------------
-
         self.choices[interaction.user.id] = choice
 
         await interaction.response.defer()
 
-        # -----------------------------------------
-        # لم يختر اللاعبان بعد
-        # لا تظهر النتيجة
-        # -----------------------------------------
-
         if len(self.choices) < 2:
             return
-
-        # -----------------------------------------
-        # الآن فقط تظهر النتيجة
-        # -----------------------------------------
 
         c1 = self.choices[self.player1.id]
         c2 = self.choices[self.player2.id]
@@ -519,7 +450,6 @@ class RPSView(discord.ui.View):
             "scissors": "✂️"
         }
 
-        # تعطيل الأزرار
         for child in self.children:
             child.disabled = True
 
@@ -528,10 +458,6 @@ class RPSView(discord.ui.View):
             self.player2.id,
             "rps_title"
         )
-
-        # -----------------------------------------
-        # تعادل
-        # -----------------------------------------
 
         if c1 == c2:
 
@@ -562,10 +488,6 @@ class RPSView(discord.ui.View):
             self.stop()
             return
 
-        # -----------------------------------------
-        # تحديد الفائز
-        # -----------------------------------------
-
         player1_wins = (
             (c1 == "rock" and c2 == "scissors")
             or
@@ -589,10 +511,6 @@ class RPSView(discord.ui.View):
 
             winner_choice = c2
             loser_choice = c1
-
-        # -----------------------------------------
-        # النتيجة العامة
-        # -----------------------------------------
 
         winner_label = get_bi_text(
             self.player1.id,
@@ -647,7 +565,6 @@ class ConnectFourView(discord.ui.View):
 
         self.current_player = player1
 
-        # 6 صفوف × 7 أعمدة
         self.board = [
             [0] * 7
             for _ in range(6)
@@ -678,10 +595,6 @@ class ConnectFourView(discord.ui.View):
 
             view: ConnectFourView = self.view
 
-            # -----------------------------------------
-            # خارج اللعبة
-            # -----------------------------------------
-
             if interaction.user not in (
                 view.player1,
                 view.player2
@@ -690,18 +603,10 @@ class ConnectFourView(discord.ui.View):
                 await interaction.response.defer()
                 return
 
-            # -----------------------------------------
-            # ليس دوره
-            # -----------------------------------------
-
             if interaction.user != view.current_player:
 
                 await interaction.response.defer()
                 return
-
-            # -----------------------------------------
-            # البحث عن مكان القطعة
-            # -----------------------------------------
 
             row_to_place = -1
 
@@ -712,15 +617,10 @@ class ConnectFourView(discord.ui.View):
                     row_to_place = r
                     break
 
-            # العمود ممتلئ
             if row_to_place == -1:
 
                 await interaction.response.defer()
                 return
-
-            # -----------------------------------------
-            # وضع القطعة
-            # -----------------------------------------
 
             piece = (
                 1
@@ -735,10 +635,6 @@ class ConnectFourView(discord.ui.View):
                 view.player2.id,
                 "c4_title"
             )
-
-            # -----------------------------------------
-            # فوز
-            # -----------------------------------------
 
             if view.check_win(piece):
 
@@ -794,10 +690,6 @@ class ConnectFourView(discord.ui.View):
                 view.stop()
                 return
 
-            # -----------------------------------------
-            # تعادل
-            # -----------------------------------------
-
             if all(
                 view.board[0][c] != 0
                 for c in range(7)
@@ -827,10 +719,6 @@ class ConnectFourView(discord.ui.View):
 
                 view.stop()
                 return
-
-            # -----------------------------------------
-            # اللاعب التالي
-            # -----------------------------------------
 
             view.current_player = (
                 view.player2
@@ -865,10 +753,6 @@ class ConnectFourView(discord.ui.View):
                 view=view
             )
 
-    # =====================================================
-    # رسم اللوحة
-    # =====================================================
-
     def render_board(self) -> str:
 
         symbols = {
@@ -893,17 +777,12 @@ class ConnectFourView(discord.ui.View):
 
         return result
 
-    # =====================================================
-    # فحص الفوز
-    # =====================================================
-
     def check_win(self, player: int) -> bool:
 
         for r in range(6):
 
             for c in range(7):
 
-                # أفقي
                 if c + 3 < 7:
 
                     if all(
@@ -913,7 +792,6 @@ class ConnectFourView(discord.ui.View):
 
                         return True
 
-                # عمودي
                 if r + 3 < 6:
 
                     if all(
@@ -923,7 +801,6 @@ class ConnectFourView(discord.ui.View):
 
                         return True
 
-                # قطري ↘
                 if (
                     r + 3 < 6
                     and c + 3 < 7
@@ -936,7 +813,6 @@ class ConnectFourView(discord.ui.View):
 
                         return True
 
-                # قطري ↗
                 if (
                     r - 3 >= 0
                     and c + 3 < 7
@@ -961,10 +837,6 @@ class GamesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
 
         self.bot = bot
-
-    # =====================================================
-    # XO
-    # =====================================================
 
     @app_commands.command(
         name="xo",
@@ -1018,10 +890,6 @@ class GamesCog(commands.Cog):
             view=view
         )
 
-    # =====================================================
-    # RPS
-    # =====================================================
-
     @app_commands.command(
         name="rps",
         description="Start Rock Paper Scissors / بدء لعبة حجرة ورقة مقص"
@@ -1065,10 +933,6 @@ class GamesCog(commands.Cog):
             msg,
             view=view
         )
-
-    # =====================================================
-    # CONNECT FOUR
-    # =====================================================
 
     @app_commands.command(
         name="connect4",
