@@ -5,6 +5,42 @@ from deep_translator import GoogleTranslator
 from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
+from pymongo import MongoClient
+
+# =========================================================
+# الاتصال بقاعدة بيانات MongoDB Atlas
+# =========================================================
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    print("⚠️ تحذير: لم يتم العثور على MONGO_URI في متغيرات البيئة!")
+
+mongo_client = MongoClient(MONGO_URI)
+db = mongo_client["bot_database"]
+users_col = db["user_profiles"]
+
+
+# --- إدارة البيانات باستخدام MongoDB ---
+def load_user_profiles():
+    profiles = {}
+    for doc in users_col.find():
+        user_id = doc["_id"]
+        profiles[user_id] = {
+            "gender": doc.get("gender", "Not Set"),
+            "age": doc.get("age", "Not Set"),
+            "country": doc.get("country", "Not Set"),
+            "language": doc.get("language", "en"),
+        }
+    return profiles
+
+
+def update_user_field(user_id, field, value):
+    user_str = str(user_id)
+    users_col.update_one(
+        {"_id": user_str},
+        {"$set": {field: value}},
+        upsert=True
+    )
+
 
 # إعداد البوت
 intents = discord.Intents.default()
@@ -12,31 +48,6 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-DATA_FILE = "user_profiles.json"
-
-
-# --- إدارة البيانات ---
-def load_user_profiles():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def update_user_field(user_id, field, value):
-    data = load_user_profiles()
-    user_str = str(user_id)
-    if user_str not in data:
-        data[user_str] = {
-            "gender": "Not Set",
-            "age": "Not Set",
-            "country": "Not Set",
-            "language": "en",
-        }
-    data[user_str][field] = value
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 # --- وظيفة مساعدة لإدارة الرتب التلقائية ---
@@ -46,7 +57,6 @@ async def assign_profile_role(
     selected_role_name: str,
     role_color: discord.Color = discord.Color.default(),
 ):
-    """تضيف الرتبة المختارة للمستخدم وتزيل بقية الرتب التابعة لنفس الفئة."""
     guild = interaction.guild
 
     if not guild:
@@ -199,7 +209,6 @@ TRANSLATIONS = {
     },
 }
 
-# --- قوائم خيارات الرتب التلقائية (موحدة بالإيموجي والأرقام الإنجليزية) ---
 GENDER_ROLES = ["♂️", "♀️"]
 
 AGE_ROLES = [
@@ -420,7 +429,7 @@ class LanguageButtonView(discord.ui.View):
         await self.handle_lang_click(interaction, "ko")
 
 
-# --- واجهة إدارة البروفايل (Profile Management View) ---
+# --- واجهة إدارة البروفايل ---
 class ProfileManageView(discord.ui.View):
 
     def __init__(self, user_lang: str):
@@ -469,9 +478,7 @@ async def on_ready():
     await bot.load_extension("games")
     bot.add_view(LanguageButtonView())
     synced = await bot.tree.sync()
-    print(
-        f"تم تسجيل الدخول باسم {bot.user}، وتم مزامنة الأوامر بنجاح!"
-    )
+    print(f"تم تسجيل الدخول باسم {bot.user}، وتم مزامنة الأوامر بنجاح!")
 
 
 @bot.event
@@ -651,7 +658,7 @@ async def translate_message(
             source="auto", target=target_lang
         ).translate(message.content)
         response_text = (
-            f"🌐 **الترجمة إلى ({target_lang}):**\n```{translated_text}```"
+            f"🌐 **الترجمة إلى ({target_lang}):**\n```{target_lang}```"
         )
         await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
