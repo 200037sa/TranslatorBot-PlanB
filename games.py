@@ -16,6 +16,7 @@ def get_user_lang(user_id: int) -> str:
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                return data.get(str(user_id), {}).get("language", "en")
         except Exception:
             pass
     return "en"
