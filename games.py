@@ -23,7 +23,7 @@ def get_user_lang(user_id: int) -> str:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            lang = data.get(str(user_id), {}).get("language", "ar")
+            lang = data.get(str(user_id), {}).get("language", "en")
 
             if lang in ("ar", "en", "es", "ja", "ko"):
                 return lang
@@ -31,7 +31,7 @@ def get_user_lang(user_id: int) -> str:
         except Exception:
             pass
 
-    return "ar"
+    return "en"
 
 
 # =========================================================
