@@ -9,7 +9,7 @@ from discord.ext import commands
 # الإعدادات
 # =========================================================
 
-GAMES_CHANNEL_ID = 1537829034065403925
+GAMES_CHANNEL_ID = 1537949579457339483
 DATA_FILE = "user_profiles.json"
 ALLOWED_GAME_COMMANDS = {"xo", "rps", "connect4"}
 
