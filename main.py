@@ -272,7 +272,7 @@ class GenderSelect(discord.ui.Select):
         role_color = (
             discord.Color.blue()
             if selected_gender == "♂️"
-            else discord.Color.from_rgb(233, 30, 99)
+            else discord.Color.pink()  # وردي أنثوي ناعم (Soft Pink)
         )
 
         await assign_profile_role(
@@ -566,13 +566,20 @@ async def user_request_survey(interaction: discord.Interaction):
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_survey(interaction: discord.Interaction):
+    # تأجير الرد فوراً لتجنب انتهاء مهلة الـ Interaction
+    await interaction.response.defer(ephemeral=True)
+    
     embed = discord.Embed(
         title="🌐 Choose Your Language / اختر لغتك المفضلة",
         description="Click your language button below to set up your profile and enable instant translation!",
         color=discord.Color.blue(),
     )
+    
+    # إرسال الرسالة الرئيسية في القناة
     await interaction.channel.send(embed=embed, view=LanguageButtonView())
-    await interaction.response.send_message(
+    
+    # الرد التأكيدي باستخدام followup بعد الـ defer
+    await interaction.followup.send(
         "✅ Language selection buttons sent successfully!", ephemeral=True
     )
 
@@ -658,7 +665,7 @@ async def translate_message(
             source="auto", target=target_lang
         ).translate(message.content)
         response_text = (
-            f"🌐 **الترجمة إلى ({target_lang}):**\n```{target_lang}```"
+            f"🌐 **الترجمة إلى ({target_lang}):**\n```{translated_text}```"
         )
         await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
