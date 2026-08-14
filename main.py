@@ -466,6 +466,7 @@ class ProfileManageView(discord.ui.View):
 # --- الأحداث والبداية ---
 @bot.event
 async def on_ready():
+    await bot.load_extension("games")
     bot.add_view(LanguageButtonView())
     synced = await bot.tree.sync()
     print(
