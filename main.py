@@ -1,7 +1,9 @@
 import json
 import os
 import re
+import urllib.parse
 import discord
+import requests
 from deep_translator import GoogleTranslator
 from discord import app_commands
 from discord.ext import commands
@@ -16,6 +18,74 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 DATA_FILE = "user_profiles.json"
 
+# =========================================================
+# منطق ترجمة العربيزي (Hybrid Transliteration Engine)
+# =========================================================
+
+WORD_DICTIONARY = {
+    "tmam": "تمام",
+    "shokran": "شكرا",
+    "mabrook": "مبروك",
+}
+
+CHAR_MAP = [
+    ('kh', 'خ'), ('gh', 'غ'), ('ch', 'ش'), ('sh', 'ش'),
+    ('th', 'ث'), ('dh', 'ذ'),
+    ('2', 'أ'),  ('3', 'ع'),  ('5', 'خ'),  ('6', 'ط'),
+    ('7', 'ح'),  ('8', 'ق'),  ('9', 'ق'),
+    ('a', 'ا'),  ('b', 'ب'),  ('t', 'ت'),  ('g', 'ج'),
+    ('j', 'ج'),  ('h', 'ه'),  ('d', 'د'),  ('r', 'ر'),
+    ('z', 'ز'),  ('s', 'س'),  ('q', 'ق'),  ('k', 'ك'),
+    ('l', 'ل'),  ('m', 'م'),  ('n', 'ن'),  ('w', 'و'),
+    ('o', 'و'),  ('u', 'و'),  ('y', 'ي'),  ('i', 'ي'),
+    ('e', 'ي'),  ('f', 'ف'),  ('p', 'ب'),  ('v', 'ف'),
+    ('x', 'كس')
+]
+
+def get_arabic_from_yamli(word: str) -> str:
+    """البحث أونلاين عن طريق Yamli بدون الحاجة لـ API Key"""
+    try:
+        encoded_word = urllib.parse.quote(word)
+        url = f"https://api.yamli.com/api/transliterate/adapter=yamli&pt=1&account_id=0&text={encoded_word}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        response = requests.get(url, headers=headers, timeout=2)
+        
+        if response.status_code == 200:
+            data = response.json()
+            r_data = data.get("r", "")
+            if r_data:
+                first_match = r_data.split("|")[0].split("/")[0]
+                return first_match
+    except Exception as e:
+        print(f"⚠️ Yamli search error for word '{word}': {e}")
+    return None
+
+def translate_word_arabizi(word: str) -> str:
+    clean_word = word.lower()
+    if clean_word in WORD_DICTIONARY:
+        return WORD_DICTIONARY[clean_word]
+    
+    online_result = get_arabic_from_yamli(clean_word)
+    if online_result:
+        return online_result
+    
+    translated = clean_word
+    for eng, ara in CHAR_MAP:
+        translated = translated.replace(eng, ara)
+    return translated
+
+def process_arabizi_text(text: str) -> str:
+    """تحويل نص العربيزي إلى نص عربي مع الحفاظ على الفواصل والرموز"""
+    words = re.findall(r'\b\w+\b|\s+|[^\w\s]', text)
+    result = []
+    
+    for item in words:
+        if item.isalnum() and not item.isdigit() and not re.search(r'[\u0600-\u06FF]', item):
+            result.append(translate_word_arabizi(item))
+        else:
+            result.append(item)
+            
+    return "".join(result)
 
 # --- إدارة البيانات ---
 def load_user_profiles():
@@ -42,11 +112,10 @@ def update_user_field(user_id, field, value):
 
 # --- وظيفة ذكية لترجمة النصوص المخلطة والحفاظ على التنسيق والإيموجي ---
 def translate_smart_preserve_format(text: str, target_lang: str) -> str:
-    """ترجمة النصوص العربية إلى اللغة الهدف مع الحفاظ على التنسيق والرموز والنصوص الإنجليزية."""
+    """ترجمة النصوص إلى اللغة الهدف مع الحفاظ على التنسيق والرموز."""
     if not text:
         return text
 
-    # إذا كانت اللغة المستهدفة هي العربية اصلاً، نعيد النص كما هو
     if target_lang == "ar":
         return text
 
@@ -54,17 +123,14 @@ def translate_smart_preserve_format(text: str, target_lang: str) -> str:
     lines = text.split("\n")
     translated_lines = []
 
-    # regex للتحقق من وجود حروف عربية
     arabic_pattern = re.compile(r"[\u0600-\u06FF]")
 
     for line in lines:
-        # إذا كان السطر فارغاً أو لا يحتوي على حروف عربية، نتركه كما هو
         if not line.strip() or not arabic_pattern.search(line):
             translated_lines.append(line)
             continue
 
         try:
-            # ترجمة السطر بأكمله؛ GoogleTranslator يحافظ على الكلمات الإنجليزية والإيموجيات ضمن التنسيق
             translated_line = translator.translate(line)
             translated_lines.append(translated_line)
         except Exception:
@@ -101,7 +167,6 @@ async def assign_profile_role(
             print(f"❌ تعذر جلب العضو من السيرفر: {e}")
             return
 
-    # إزالة أي رتبة سابقة تنتمي لنفس الفئة
     roles_to_remove = [
         role
         for role in member.roles
@@ -113,7 +178,6 @@ async def assign_profile_role(
         except discord.Forbidden:
             print("❌ البوت لا يملك صلاحية Manage Roles لإزالة الرتب.")
 
-    # البحث عن الرتبة أو إنشاؤها
     target_role = discord.utils.get(guild.roles, name=selected_role_name)
     if not target_role:
         try:
@@ -126,7 +190,6 @@ async def assign_profile_role(
             print("❌ البوت لا يملك صلاحية Manage Roles لإنشاء الرتبة.")
             return
 
-    # إسناد الرتبة
     if target_role not in member.roles:
         try:
             await member.add_roles(target_role)
@@ -250,7 +313,7 @@ COUNTRY_OPTIONS = [
     {"label": "مصر / Egypt", "emoji": "🇪🇬", "value": "🇪🇬"},
     {"label": "الجزائر / Algeria", "emoji": "🇩🇿", "value": "🇩🇿"},
     {"label": "فلسطين / Palestine", "emoji": "🇵🇸", "value": "🇵🇸"},
-    {"label": "الإارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
+    {"label": "الإمارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
     {"label": "العراق / Iraq", "emoji": "🇮🇶", "value": "🇮🇶"},
     {"label": "المغرب / Morocco", "emoji": "🇲🇦", "value": "🇲🇦"},
     {"label": "تونس / Tunisia", "emoji": "🇹🇳", "value": "🇹🇳"},
@@ -634,6 +697,75 @@ async def quick_translate(
         await interaction.followup.send(
             f"❌ حدث خطأ أثناء الترجمة: {e}", ephemeral=True
         )
+
+
+# =========================================================
+# أمر ترجمة العربيزي (/arabizi أو /3)
+# =========================================================
+@bot.tree.command(
+    name="arabizi", description="ترجمة نص عربيزي إلى العربية (أو لغتك المحددة في البروفايل)"
+)
+@app_commands.describe(text="النص المراد تحويله من عربيزي (اختياري إذا أردت استخدام الرد Reply)")
+async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = None):
+    target_text = text
+
+    # إذا لم يدخل المستخدم نصاً صريحاً، نبحث عن الرسالة المعمول لها Reply
+    if not target_text:
+        channel = interaction.channel
+        target_msg = None
+
+        if interaction.data.get("resolved", {}).get("messages"):
+            target_msg = list(interaction.data["resolved"]["messages"].values())[0]
+
+        try:
+            async for msg in channel.history(limit=10):
+                if (
+                    msg.author.id == interaction.user.id
+                    and msg.reference
+                    and msg.reference.message_id
+                ):
+                    target_msg = await channel.fetch_message(msg.reference.message_id)
+                    break
+        except Exception:
+            pass
+
+        if target_msg and target_msg.content:
+            target_text = target_msg.content
+
+    if not target_text:
+        await interaction.response.send_message(
+            "⚠️ يرجى استخدام الأمر كـ **رد (Reply)** على رسالة العربيزي، أو كتابة النص داخل خيار `text`!",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    # 1. تحويل العربيزي إلى العربية باستخدام المحرك الهجين
+    arabic_text = process_arabizi_text(target_text)
+
+    # 2. معرفة لغة المستخدم المفضلة في البروفايل
+    profiles = load_user_profiles()
+    user_info = profiles.get(str(interaction.user.id), {})
+    user_lang = user_info.get("language", "ar")
+
+    # 3. إذا كانت لغة المستخدم ليست العربية، نترجم النص العربي إلى لغته
+    if user_lang != "ar":
+        final_output = translate_smart_preserve_format(arabic_text, user_lang)
+        response_msg = f"🔤 **الترجمة من العربيزي ({user_lang}):**\n\n{final_output}"
+    else:
+        response_msg = f"🔤 **الترجمة من العربيزي:**\n\n{arabic_text}"
+
+    await interaction.followup.send(response_msg, ephemeral=True)
+
+
+# أمر مختصر للأرقام بنفس وظيفة ترجمة العربيزي (/3)
+@bot.tree.command(
+    name="3", description="أمر مختصر لترجمة العربيزي إلى العربية"
+)
+@app_commands.describe(text="النص المراد تحويله من عربيزي (اختياري)")
+async def translate_arabizi_short(interaction: discord.Interaction, text: str = None):
+    await translate_arabizi_cmd(interaction, text)
 
 
 # --- أمر الترجمة بالزر الأيمن للفأرة (Context Menu) ---

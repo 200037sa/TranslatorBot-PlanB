@@ -1,5 +1,7 @@
 import json
 import os
+import random
+import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -156,68 +158,7 @@ class TicTacToeButton(discord.ui.Button):
             await interaction.response.defer()
             return
 
-        if view.current_player == view.player1:
-            self.label = "❌"
-            self.style = discord.ButtonStyle.danger
-            view.board[self.y][self.x] = 1
-            next_player = view.player2
-        else:
-            self.label = "⭕"
-            self.style = discord.ButtonStyle.primary
-            view.board[self.y][self.x] = 2
-            next_player = view.player1
-
-        self.disabled = True
-        title = get_bi_text(view.player1.id, view.player2.id, "xo_title")
-        winner = view.check_winner()
-
-        if winner:
-            for child in view.children:
-                child.disabled = True
-
-            loser = view.player2 if winner == view.player1 else view.player1
-            winner_label = get_bi_text(view.player1.id, view.player2.id, "winner")
-            loser_label = get_bi_text(view.player1.id, view.player2.id, "loser")
-            winner_symbol = "❌" if winner == view.player1 else "⭕"
-            loser_symbol = "❌" if loser == view.player1 else "⭕"
-
-            content = (
-                f"{title}\n\n"
-                f"{winner_label}\n"
-                f"{winner_symbol} {winner.mention}\n\n"
-                f"{loser_label}\n"
-                f"{loser_symbol} {loser.mention}"
-            )
-
-            await interaction.response.edit_message(content=content, view=view)
-            view.stop()
-            return
-
-        if view.is_full():
-            for child in view.children:
-                child.disabled = True
-
-            draw_label = get_bi_text(view.player1.id, view.player2.id, "draw")
-            content = (
-                f"{title}\n\n"
-                f"{draw_label}\n\n"
-                f"❌ {view.player1.mention} = ⭕ {view.player2.mention}"
-            )
-
-            await interaction.response.edit_message(content=content, view=view)
-            view.stop()
-            return
-
-        view.current_player = next_player
-        current_symbol = "❌" if view.current_player == view.player1 else "⭕"
-
-        content = (
-            f"{title}\n\n"
-            f"❌ {view.player1.mention} VS ⭕ {view.player2.mention}\n"
-            f"👉 {current_symbol} {view.current_player.mention}"
-        )
-
-        await interaction.response.edit_message(content=content, view=view)
+        await view.process_turn(interaction, self)
 
 
 class TicTacToeView(discord.ui.View):
@@ -253,6 +194,87 @@ class TicTacToeView(discord.ui.View):
     def is_full(self):
         return all(cell != 0 for row in self.board for cell in row)
 
+    async def process_turn(self, interaction: discord.Interaction, button: TicTacToeButton):
+        if self.current_player == self.player1:
+            button.label = "❌"
+            button.style = discord.ButtonStyle.danger
+            self.board[button.y][button.x] = 1
+            next_player = self.player2
+        else:
+            button.label = "⭕"
+            button.style = discord.ButtonStyle.primary
+            self.board[button.y][button.x] = 2
+            next_player = self.player1
+
+        button.disabled = True
+        title = get_bi_text(self.player1.id, self.player2.id, "xo_title")
+        winner = self.check_winner()
+
+        if winner:
+            for child in self.children:
+                child.disabled = True
+
+            loser = self.player2 if winner == self.player1 else self.player1
+            winner_label = get_bi_text(self.player1.id, self.player2.id, "winner")
+            loser_label = get_bi_text(self.player1.id, self.player2.id, "loser")
+            winner_symbol = "❌" if winner == self.player1 else "⭕"
+            loser_symbol = "❌" if loser == self.player1 else "⭕"
+
+            content = (
+                f"{title}\n\n"
+                f"{winner_label}\n"
+                f"{winner_symbol} {winner.mention}\n\n"
+                f"{loser_label}\n"
+                f"{loser_symbol} {loser.mention}"
+            )
+
+            if interaction.response.is_done():
+                await interaction.message.edit(content=content, view=self)
+            else:
+                await interaction.response.edit_message(content=content, view=self)
+            self.stop()
+            return
+
+        if self.is_full():
+            for child in self.children:
+                child.disabled = True
+
+            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw")
+            content = (
+                f"{title}\n\n"
+                f"{draw_label}\n\n"
+                f"❌ {self.player1.mention} = ⭕ {self.player2.mention}"
+            )
+
+            if interaction.response.is_done():
+                await interaction.message.edit(content=content, view=self)
+            else:
+                await interaction.response.edit_message(content=content, view=self)
+            self.stop()
+            return
+
+        self.current_player = next_player
+        current_symbol = "❌" if self.current_player == self.player1 else "⭕"
+
+        content = (
+            f"{title}\n\n"
+            f"❌ {self.player1.mention} VS ⭕ {self.player2.mention}\n"
+            f"👉 {current_symbol} {self.current_player.mention}"
+        )
+
+        if interaction.response.is_done():
+            await interaction.message.edit(content=content, view=self)
+        else:
+            await interaction.response.edit_message(content=content, view=self)
+
+        # إذا كان الدور على البوت، يلعب عشوائياً
+        if self.current_player.bot:
+            await asyncio.sleep(1)
+            available_buttons = [b for b in self.children if isinstance(b, TicTacToeButton) and not b.disabled]
+            if available_buttons:
+                chosen_button = random.choice(available_buttons)
+                await self.process_turn(interaction, chosen_button)
+
 
 # =========================================================
 # 2. ROCK PAPER SCISSORS
@@ -265,6 +287,10 @@ class RPSView(discord.ui.View):
         self.player1 = player1
         self.player2 = player2
         self.choices = {}
+
+        # اختيار عشوائي للبوت مسبقاً إذا كان مشاركاً
+        if self.player2.bot:
+            self.choices[self.player2.id] = random.choice(["rock", "paper", "scissors"])
 
     @discord.ui.button(label="🪨", style=discord.ButtonStyle.primary)
     async def rock(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -380,72 +406,99 @@ class ConnectFourView(discord.ui.View):
                 await interaction.response.defer()
                 return
 
-            row_to_place = -1
-            for r in range(5, -1, -1):
-                if view.board[r][self.col] == 0:
-                    row_to_place = r
-                    break
+            await view.process_turn(interaction, self.col)
 
-            if row_to_place == -1:
+    async def process_turn(self, interaction: discord.Interaction, col: int):
+        row_to_place = -1
+        for r in range(5, -1, -1):
+            if self.board[r][col] == 0:
+                row_to_place = r
+                break
+
+        if row_to_place == -1:
+            if not interaction.response.is_done():
                 await interaction.response.defer()
-                return
+            return
 
-            piece = 1 if view.current_player == view.player1 else 2
-            view.board[row_to_place][self.col] = piece
+        piece = 1 if self.current_player == self.player1 else 2
+        self.board[row_to_place][col] = piece
 
-            title = get_bi_text(view.player1.id, view.player2.id, "c4_title")
+        title = get_bi_text(self.player1.id, self.player2.id, "c4_title")
 
-            if view.check_win(piece):
-                for child in view.children:
-                    child.disabled = True
+        if self.check_win(piece):
+            for child in self.children:
+                child.disabled = True
 
-                winner = view.current_player
-                loser = view.player2 if winner == view.player1 else view.player1
-                winner_label = get_bi_text(view.player1.id, view.player2.id, "winner")
-                loser_label = get_bi_text(view.player1.id, view.player2.id, "loser")
-                winner_symbol = "🔴" if winner == view.player1 else "🟡"
-                loser_symbol = "🔴" if loser == view.player1 else "🟡"
-
-                msg = (
-                    f"{view.render_board()}\n\n"
-                    f"{title}\n\n"
-                    f"{winner_label}\n"
-                    f"{winner_symbol} {winner.mention}\n\n"
-                    f"{loser_label}\n"
-                    f"{loser_symbol} {loser.mention}"
-                )
-
-                await interaction.response.edit_message(content=msg, view=view)
-                view.stop()
-                return
-
-            if all(view.board[0][c] != 0 for c in range(7)):
-                for child in view.children:
-                    child.disabled = True
-
-                draw_label = get_bi_text(view.player1.id, view.player2.id, "draw")
-                msg = (
-                    f"{view.render_board()}\n\n"
-                    f"{title}\n\n"
-                    f"{draw_label}\n\n"
-                    f"🔴 {view.player1.mention} = 🟡 {view.player2.mention}"
-                )
-
-                await interaction.response.edit_message(content=msg, view=view)
-                view.stop()
-                return
-
-            view.current_player = view.player2 if view.current_player == view.player1 else view.player1
-            current_symbol = "🔴" if view.current_player == view.player1 else "🟡"
+            winner = self.current_player
+            loser = self.player2 if winner == self.player1 else self.player1
+            winner_label = get_bi_text(self.player1.id, self.player2.id, "winner")
+            loser_label = get_bi_text(self.player1.id, self.player2.id, "loser")
+            winner_symbol = "🔴" if winner == self.player1 else "🟡"
+            loser_symbol = "🔴" if loser == self.player1 else "🟡"
 
             msg = (
-                f"{view.render_board()}\n\n"
+                f"{self.render_board()}\n\n"
                 f"{title}\n\n"
-                f"🔴 {view.player1.mention} VS 🟡 {view.player2.mention}\n"
-                f"👉 {current_symbol} {view.current_player.mention}"
+                f"{winner_label}\n"
+                f"{winner_symbol} {winner.mention}\n\n"
+                f"{loser_label}\n"
+                f"{loser_symbol} {loser.mention}"
             )
 
-            await interaction.response.edit_message(content=msg, view=view)
+            if interaction.response.is_done():
+                await interaction.message.edit(content=msg, view=self)
+            else:
+                await interaction.response.edit_message(content=msg, view=self)
+            self.stop()
+            return
+
+        # تعطيل أزرار الأعمدة الممتلئة بالكامل (7 خيارات تقل عند امتلاء العمود)
+        for child in self.children:
+            if isinstance(child, self.ColButton):
+                if self.board[0][child.col] != 0:
+                    child.disabled = True
+
+        if all(self.board[0][c] != 0 for c in range(7)):
+            for child in self.children:
+                child.disabled = True
+
+            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw")
+            msg = (
+                f"{self.render_board()}\n\n"
+                f"{title}\n\n"
+                f"{draw_label}\n\n"
+                f"🔴 {self.player1.mention} = 🟡 {self.player2.mention}"
+            )
+
+            if interaction.response.is_done():
+                await interaction.message.edit(content=msg, view=self)
+            else:
+                await interaction.response.edit_message(content=msg, view=self)
+            self.stop()
+            return
+
+        self.current_player = self.player2 if self.current_player == self.player1 else self.player1
+        current_symbol = "🔴" if self.current_player == self.player1 else "🟡"
+
+        msg = (
+            f"{self.render_board()}\n\n"
+            f"{title}\n\n"
+            f"🔴 {self.player1.mention} VS 🟡 {self.player2.mention}\n"
+            f"👉 {current_symbol} {self.current_player.mention}"
+        )
+
+        if interaction.response.is_done():
+            await interaction.message.edit(content=msg, view=self)
+        else:
+            await interaction.response.edit_message(content=msg, view=self)
+
+        # إذا كان الدور على البوت، يختار عموداً متاحاً عشوائياً
+        if self.current_player.bot:
+            await asyncio.sleep(1)
+            valid_cols = [c for c in range(7) if self.board[0][c] == 0]
+            if valid_cols:
+                chosen_col = random.choice(valid_cols)
+                await self.process_turn(interaction, chosen_col)
 
     def render_board(self) -> str:
         symbols = {0: "⚪", 1: "🔴", 2: "🟡"}
@@ -478,7 +531,6 @@ class GamesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # مسح أي رسالة نصية عادية من أي عضو/أدمن في روم الألعاب
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.channel.id == GAMES_CHANNEL_ID:
@@ -488,7 +540,6 @@ class GamesCog(commands.Cog):
                 except discord.HTTPException:
                     pass
 
-    # --- أمر دليل الألعاب ---
     @app_commands.command(
         name="games",
         description="Show available server games and instructions / عرض قائمة الألعاب والشرح"
@@ -534,7 +585,6 @@ class GamesCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # --- لعبة إكس أوه ---
     @app_commands.command(
         name="xo",
         description="Start a Tic-Tac-Toe game / بدء لعبة إكس أوه"
@@ -543,9 +593,9 @@ class GamesCog(commands.Cog):
         if not await check_games_channel(interaction):
             return
 
-        if opponent.bot or opponent.id == interaction.user.id:
+        if opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                "❌ لا يمكنك اللعب ضد البوتات أو ضد نفسك!", ephemeral=True
+                "❌ لا يمكنك اللعب ضد نفسك!", ephemeral=True
             )
             return
 
@@ -560,7 +610,6 @@ class GamesCog(commands.Cog):
 
         await interaction.response.send_message(msg, view=view)
 
-    # --- لعبة حجرة ورقة مقص ---
     @app_commands.command(
         name="rps",
         description="Start Rock Paper Scissors / بدء لعبة حجرة ورقة مقص"
@@ -569,9 +618,9 @@ class GamesCog(commands.Cog):
         if not await check_games_channel(interaction):
             return
 
-        if opponent.bot or opponent.id == interaction.user.id:
+        if opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                "❌ لا يمكنك اللعب ضد البوتات أو ضد نفسك!", ephemeral=True
+                "❌ لا يمكنك اللعب ضد نفسك!", ephemeral=True
             )
             return
 
@@ -585,7 +634,6 @@ class GamesCog(commands.Cog):
 
         await interaction.response.send_message(msg, view=view)
 
-    # --- لعبة أربع تربح ---
     @app_commands.command(
         name="connect4",
         description="Start a Connect Four game / بدء لعبة أربع تربح"
@@ -594,9 +642,9 @@ class GamesCog(commands.Cog):
         if not await check_games_channel(interaction):
             return
 
-        if opponent.bot or opponent.id == interaction.user.id:
+        if opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                "❌ لا يمكنك اللعب ضد البوتات أو ضد نفسك!", ephemeral=True
+                "❌ لا يمكنك اللعب ضد نفسك!", ephemeral=True
             )
             return
 
@@ -620,7 +668,6 @@ class GamesCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = GamesCog(bot)
 
-    # حظر جميع الأوامر الأخرى داخل روم الألعاب باستثناء أوامر الألعاب الأربعة
     async def global_interaction_check(interaction: discord.Interaction) -> bool:
         if interaction.channel_id == GAMES_CHANNEL_ID:
             cmd_name = interaction.command.name if interaction.command else None
