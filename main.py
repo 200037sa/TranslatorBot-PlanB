@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import discord
 from deep_translator import GoogleTranslator
 from discord import app_commands
@@ -39,6 +40,39 @@ def update_user_field(user_id, field, value):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
+# --- وظيفة ذكية لترجمة النصوص المخلطة والحفاظ على التنسيق والإيموجي ---
+def translate_smart_preserve_format(text: str, target_lang: str) -> str:
+    """ترجمة النصوص العربية إلى اللغة الهدف مع الحفاظ على التنسيق والرموز والنصوص الإنجليزية."""
+    if not text:
+        return text
+
+    # إذا كانت اللغة المستهدفة هي العربية اصلاً، نعيد النص كما هو
+    if target_lang == "ar":
+        return text
+
+    translator = GoogleTranslator(source="auto", target=target_lang)
+    lines = text.split("\n")
+    translated_lines = []
+
+    # regex للتحقق من وجود حروف عربية
+    arabic_pattern = re.compile(r"[\u0600-\u06FF]")
+
+    for line in lines:
+        # إذا كان السطر فارغاً أو لا يحتوي على حروف عربية، نتركه كما هو
+        if not line.strip() or not arabic_pattern.search(line):
+            translated_lines.append(line)
+            continue
+
+        try:
+            # ترجمة السطر بأكمله؛ GoogleTranslator يحافظ على الكلمات الإنجليزية والإيموجيات ضمن التنسيق
+            translated_line = translator.translate(line)
+            translated_lines.append(translated_line)
+        except Exception:
+            translated_lines.append(line)
+
+    return "\n".join(translated_lines)
+
+
 # --- وظيفة مساعدة لإدارة الرتب التلقائية ---
 async def assign_profile_role(
     interaction: discord.Interaction,
@@ -46,7 +80,6 @@ async def assign_profile_role(
     selected_role_name: str,
     role_color: discord.Color = discord.Color.default(),
 ):
-    """تضيف الرتبة المختارة للمستخدم وتزيل بقية الرتب التابعة لنفس الفئة."""
     guild = interaction.guild
 
     if not guild:
@@ -70,7 +103,8 @@ async def assign_profile_role(
 
     # إزالة أي رتبة سابقة تنتمي لنفس الفئة
     roles_to_remove = [
-        role for role in member.roles
+        role
+        for role in member.roles
         if role.name in category_options and role.name != selected_role_name
     ]
     if roles_to_remove:
@@ -86,7 +120,7 @@ async def assign_profile_role(
             target_role = await guild.create_role(
                 name=selected_role_name,
                 color=role_color,
-                reason="Auto-created profile role by Survey Bot",
+                reason="Auto-created profile role by Bot",
             )
         except discord.Forbidden:
             print("❌ البوت لا يملك صلاحية Manage Roles لإنشاء الرتبة.")
@@ -199,7 +233,6 @@ TRANSLATIONS = {
     },
 }
 
-# --- قوائم خيارات الرتب التلقائية (موحدة بالإيموجي والأرقام الإنجليزية) ---
 GENDER_ROLES = ["♂️", "♀️"]
 
 AGE_ROLES = [
@@ -217,7 +250,7 @@ COUNTRY_OPTIONS = [
     {"label": "مصر / Egypt", "emoji": "🇪🇬", "value": "🇪🇬"},
     {"label": "الجزائر / Algeria", "emoji": "🇩🇿", "value": "🇩🇿"},
     {"label": "فلسطين / Palestine", "emoji": "🇵🇸", "value": "🇵🇸"},
-    {"label": "الإمارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
+    {"label": "الإارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
     {"label": "العراق / Iraq", "emoji": "🇮🇶", "value": "🇮🇶"},
     {"label": "المغرب / Morocco", "emoji": "🇲🇦", "value": "🇲🇦"},
     {"label": "تونس / Tunisia", "emoji": "🇹🇳", "value": "🇹🇳"},
@@ -263,7 +296,7 @@ class GenderSelect(discord.ui.Select):
         role_color = (
             discord.Color.blue()
             if selected_gender == "♂️"
-            else discord.Color.from_rgb(233, 30, 99)
+            else discord.Color.pink()
         )
 
         await assign_profile_role(
@@ -420,7 +453,7 @@ class LanguageButtonView(discord.ui.View):
         await self.handle_lang_click(interaction, "ko")
 
 
-# --- واجهة إدارة البروفايل (Profile Management View) ---
+# --- واجهة إدارة البروفايل ---
 class ProfileManageView(discord.ui.View):
 
     def __init__(self, user_lang: str):
@@ -466,7 +499,11 @@ class ProfileManageView(discord.ui.View):
 # --- الأحداث والبداية ---
 @bot.event
 async def on_ready():
-    await bot.load_extension("games")
+    try:
+        await bot.load_extension("games")
+    except Exception as e:
+        print(f"⚠️ Extension load status: {e}")
+
     bot.add_view(LanguageButtonView())
     synced = await bot.tree.sync()
     print(
@@ -474,6 +511,7 @@ async def on_ready():
     )
 
 
+# إرسال الاستبيان واللغة تلقائياً في الخاص فور انضمام عضو جديد
 @bot.event
 async def on_member_join(member: discord.Member):
     embed = discord.Embed(
@@ -487,7 +525,7 @@ async def on_member_join(member: discord.Member):
         print(f"لم نتمكن من إرسال رسالة خاصة للعضو {member.name}")
 
 
-# --- أمر عرض/تعديل البروفايل الخاص بالعضو ---
+# --- أمر عرض وتعديل البروفايل ---
 @bot.tree.command(
     name="profile", description="عرض وتعديل بيانات ملفك الشخصي ولغتك المفضلة"
 )
@@ -540,36 +578,6 @@ async def view_profile(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(
-    name="survey", description="فتح استبيان اختيار اللغة والبيانات"
-)
-async def user_request_survey(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🌐 Choose Your Language / اختر لغتك",
-        description="Select your preferred language to start!",
-        color=discord.Color.blue(),
-    )
-    await interaction.response.send_message(
-        embed=embed, view=LanguageButtonView(), ephemeral=True
-    )
-
-
-@bot.tree.command(
-    name="setup-survey", description="إرسال لوحة اختيار اللغة في القناة (للإدارة)"
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_survey(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🌐 Choose Your Language / اختر لغتك المفضلة",
-        description="Click your language button below to set up your profile and enable instant translation!",
-        color=discord.Color.blue(),
-    )
-    await interaction.channel.send(embed=embed, view=LanguageButtonView())
-    await interaction.response.send_message(
-        "✅ Language selection buttons sent successfully!", ephemeral=True
-    )
-
-
 # --- أمر الترجمة السريعة بالرد (/t) ---
 @bot.tree.command(
     name="t", description="ترجمة الرسالة التي قمت بالرد عليها (Reply)"
@@ -617,12 +625,10 @@ async def quick_translate(
         final_lang = user_info.get("language", "en")
 
     try:
-        translated_text = GoogleTranslator(
-            source="auto", target=final_lang
-        ).translate(target_msg.content)
-        response_text = (
-            f"🌐 **الترجمة إلى ({final_lang}):**\n```{translated_text}```"
+        translated_text = translate_smart_preserve_format(
+            target_msg.content, final_lang
         )
+        response_text = f"🌐 **الترجمة إلى ({final_lang}):**\n\n{translated_text}"
         await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
         await interaction.followup.send(
@@ -630,7 +636,7 @@ async def quick_translate(
         )
 
 
-# --- أمر الترجمة بالزر الأيمن للفأرة ---
+# --- أمر الترجمة بالزر الأيمن للفأرة (Context Menu) ---
 @bot.tree.context_menu(name="Translate to My Language")
 async def translate_message(
     interaction: discord.Interaction, message: discord.Message
@@ -647,12 +653,10 @@ async def translate_message(
     target_lang = user_info.get("language", "en")
 
     try:
-        translated_text = GoogleTranslator(
-            source="auto", target=target_lang
-        ).translate(message.content)
-        response_text = (
-            f"🌐 **الترجمة إلى ({target_lang}):**\n```{translated_text}```"
+        translated_text = translate_smart_preserve_format(
+            message.content, target_lang
         )
+        response_text = f"🌐 **الترجمة إلى ({target_lang}):**\n\n{translated_text}"
         await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
         await interaction.followup.send(

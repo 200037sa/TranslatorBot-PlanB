@@ -10,8 +10,9 @@ from discord.ext import commands
 # =========================================================
 
 GAMES_CHANNEL_ID = 1537949579457339483
+GAMES_CHANNEL_URL = "https://discord.com/channels/1529585792194707609/1537949579457339483"
 DATA_FILE = "user_profiles.json"
-ALLOWED_GAME_COMMANDS = {"xo", "rps", "connect4"}
+ALLOWED_GAME_COMMANDS = {"xo", "rps", "connect4", "games"}
 
 
 # =========================================================
@@ -44,7 +45,6 @@ TEXTS = {
         "xo_title": "Tic-Tac-Toe",
         "rps_title": "Rock Paper Scissors",
         "c4_title": "Connect Four",
-        "turn": "Turn",
         "winner": "Winner",
         "loser": "Loser",
         "draw": "Draw",
@@ -53,7 +53,6 @@ TEXTS = {
         "xo_title": "إكس أوه",
         "rps_title": "حجرة ورقة مقص",
         "c4_title": "أربع تربح",
-        "turn": "الدور",
         "winner": "الفائز",
         "loser": "الخاسر",
         "draw": "تعادل",
@@ -62,7 +61,6 @@ TEXTS = {
         "xo_title": "Tres en Raya",
         "rps_title": "Piedra Papel Tijeras",
         "c4_title": "Conecta Cuatro",
-        "turn": "Turno",
         "winner": "Ganador",
         "loser": "Perdedor",
         "draw": "Empate",
@@ -71,7 +69,6 @@ TEXTS = {
         "xo_title": "○×ゲーム",
         "rps_title": "じゃんけん",
         "c4_title": "コネクトフォー",
-        "turn": "手番",
         "winner": "勝者",
         "loser": "敗者",
         "draw": "引き分け",
@@ -80,17 +77,12 @@ TEXTS = {
         "xo_title": "틱택토",
         "rps_title": "가위바위보",
         "c4_title": "커넥트 포",
-        "turn": "차례",
         "winner": "승자",
         "loser": "패자",
         "draw": "무승부",
     },
 }
 
-
-# =========================================================
-# نص ثنائي اللغة حسب لغتي اللاعبين
-# =========================================================
 
 def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
     lang1 = get_user_lang(p1_id)
@@ -103,6 +95,35 @@ def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
         return text1
 
     return f"{text1} / {text2}"
+
+
+# =========================================================
+# واجهة التحويل إلى قناة الألعاب
+# =========================================================
+
+class GoToGamesChannelView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="🧩 الانتقال إلى روم الألعاب / Go to Games",
+                url=GAMES_CHANNEL_URL,
+                style=discord.ButtonStyle.link,
+            )
+        )
+
+
+async def check_games_channel(interaction: discord.Interaction) -> bool:
+    """تحقق مما إذا كان المستخدم داخل روم الألعاب أم لا"""
+    if interaction.channel_id != GAMES_CHANNEL_ID:
+        await interaction.response.send_message(
+            "⚠️ **عذراً، هذه الأوامر مخصصة فقط لقناة الألعاب!**\n"
+            "Sorry, these commands can only be used in the games channel!",
+            view=GoToGamesChannelView(),
+            ephemeral=True,
+        )
+        return False
+    return True
 
 
 # =========================================================
@@ -457,7 +478,7 @@ class GamesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # 1. مسح أي رسالة نصية عادية من أي عضو/أدمن في روم الألعاب
+    # مسح أي رسالة نصية عادية من أي عضو/أدمن في روم الألعاب
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.channel.id == GAMES_CHANNEL_ID:
@@ -467,17 +488,65 @@ class GamesCog(commands.Cog):
                 except discord.HTTPException:
                     pass
 
+    # --- أمر دليل الألعاب ---
+    @app_commands.command(
+        name="games",
+        description="Show available server games and instructions / عرض قائمة الألعاب والشرح"
+    )
+    async def games_menu(self, interaction: discord.Interaction):
+        if not await check_games_channel(interaction):
+            return
+
+        embed = discord.Embed(
+            title="🎮 قائمة ألعاب السيرفر / Server Games",
+            description="مرحباً بك في قسم الألعاب! يمكنك منافسة الأعضاء باستخدام الأوامر التالية:",
+            color=discord.Color.purple()
+        )
+
+        embed.add_field(
+            name="❌⭕ 1. لعبة إكس أوه (/xo)",
+            value=(
+                "**الاستخدام:** `/xo @User`\n"
+                "**الشرح:** لعبة Tic-Tac-Toe المعروفة. تناوب مع خصمك على إكمال خط من 3 رمور (أفقياً، عمودياً، أو قطرياً) لتمكين الفوز."
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="🪨📄✂️ 2. حجرة ورقة مقص (/rps)",
+            value=(
+                "**الاستخدام:** `/rps @User`\n"
+                "**الشرح:** اخترا خياراتكما سرا بالضغط على الأزرار. الحجرة تهزم المقص، والمقص يهزم الورقة، والورقة تهزم الحجرة."
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="🔴🟡 3. لعبة أربع تربح (/connect4)",
+            value=(
+                "**الاستخدام:** `/connect4 @User`\n"
+                "**الشرح:** اختر العمود (1-7) لإسقاط القرص الخاص بك. أول لاعب يجمع 4 أقراص متتالية في أي اتجاه يفوز."
+            ),
+            inline=False
+        )
+
+        embed.set_footer(text="ملاحظة: جميع الأوامر تعمل حصرياً في هذه القناة.")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # --- لعبة إكس أوه ---
     @app_commands.command(
         name="xo",
         description="Start a Tic-Tac-Toe game / بدء لعبة إكس أوه"
     )
     async def xo(self, interaction: discord.Interaction, opponent: discord.User):
-        if interaction.channel_id != GAMES_CHANNEL_ID:
-            await interaction.response.defer()
+        if not await check_games_channel(interaction):
             return
 
         if opponent.bot or opponent.id == interaction.user.id:
-            await interaction.response.defer()
+            await interaction.response.send_message(
+                "❌ لا يمكنك اللعب ضد البوتات أو ضد نفسك!", ephemeral=True
+            )
             return
 
         view = TicTacToeView(interaction.user, opponent)
@@ -491,17 +560,19 @@ class GamesCog(commands.Cog):
 
         await interaction.response.send_message(msg, view=view)
 
+    # --- لعبة حجرة ورقة مقص ---
     @app_commands.command(
         name="rps",
         description="Start Rock Paper Scissors / بدء لعبة حجرة ورقة مقص"
     )
     async def rps(self, interaction: discord.Interaction, opponent: discord.User):
-        if interaction.channel_id != GAMES_CHANNEL_ID:
-            await interaction.response.defer()
+        if not await check_games_channel(interaction):
             return
 
         if opponent.bot or opponent.id == interaction.user.id:
-            await interaction.response.defer()
+            await interaction.response.send_message(
+                "❌ لا يمكنك اللعب ضد البوتات أو ضد نفسك!", ephemeral=True
+            )
             return
 
         view = RPSView(interaction.user, opponent)
@@ -514,17 +585,19 @@ class GamesCog(commands.Cog):
 
         await interaction.response.send_message(msg, view=view)
 
+    # --- لعبة أربع تربح ---
     @app_commands.command(
         name="connect4",
         description="Start a Connect Four game / بدء لعبة أربع تربح"
     )
     async def connect4(self, interaction: discord.Interaction, opponent: discord.User):
-        if interaction.channel_id != GAMES_CHANNEL_ID:
-            await interaction.response.defer()
+        if not await check_games_channel(interaction):
             return
 
         if opponent.bot or opponent.id == interaction.user.id:
-            await interaction.response.defer()
+            await interaction.response.send_message(
+                "❌ لا يمكنك اللعب ضد البوتات أو ضد نفسك!", ephemeral=True
+            )
             return
 
         view = ConnectFourView(interaction.user, opponent)
@@ -547,7 +620,7 @@ class GamesCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = GamesCog(bot)
 
-    # 2. حظر جميع الأوامر الأخرى داخل روم الألعاب باستثناء أوامر الألعاب الثلاثة صامتةً
+    # حظر جميع الأوامر الأخرى داخل روم الألعاب باستثناء أوامر الألعاب الأربعة
     async def global_interaction_check(interaction: discord.Interaction) -> bool:
         if interaction.channel_id == GAMES_CHANNEL_ID:
             cmd_name = interaction.command.name if interaction.command else None
