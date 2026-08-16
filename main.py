@@ -821,15 +821,16 @@ async def quick_translate(
 
 
 # =========================================================
-# أمر ترجمة العربيزي (/arabizi) - يعمل بالرد فقط (Reply)
+# أمر ترجمة العربيزي بالرد فقط (/arabizi)
 # =========================================================
 @bot.tree.command(
-    name="arabizi", description="ترجمة رسالة عربيزي قمت بالرد عليها (Reply)"
+    name="arabizi", description="ترجمة نص عربيزي إلى العربية بالرد (Reply) على الرسالة فقط"
 )
 async def translate_arabizi_cmd(interaction: discord.Interaction):
     channel = interaction.channel
     target_msg = None
 
+    # التحقق مما إذا كانت الكوماند استخدمت كـ Reply
     if interaction.data.get("resolved", {}).get("messages"):
         target_msg = list(interaction.data["resolved"]["messages"].values())[0]
 
@@ -845,16 +846,18 @@ async def translate_arabizi_cmd(interaction: discord.Interaction):
     except Exception:
         pass
 
+    # إذا لم تكن الرسالة رداً على رسالة أخرى
     if not target_msg or not target_msg.content:
         await interaction.response.send_message(
-            "⚠️ يرجى استخدام الأمر `/arabizi` كـ **رد (Reply)** على الرسالة التي تريد ترجمتها!",
+            "⚠️ يرجى استخدام الأمر `/arabizi` كـ **رد (Reply)** فقط على الرسالة التي تريد ترجمتها!",
             ephemeral=True,
         )
         return
 
     await interaction.response.defer(ephemeral=True)
 
-    arabic_text = process_arabizi_text(target_msg.content)
+    target_text = target_msg.content
+    arabic_text = process_arabizi_text(target_text)
 
     user_info = get_user_profile(interaction.user.id)
     user_lang = user_info.get("language", "ar")
