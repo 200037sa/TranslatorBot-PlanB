@@ -5,3 +5,4 @@ waitress
 pymongo
 motor
 requests
+firebase-admin

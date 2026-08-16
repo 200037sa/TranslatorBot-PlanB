@@ -4,19 +4,45 @@ import re
 import urllib.parse
 import discord
 import requests
+import firebase_admin
+from firebase_admin import credentials, db
 from deep_translator import GoogleTranslator
 from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
 
+# =========================================================
+# إعداد Firebase Realtime Database
+# =========================================================
+FIREBASE_DB_URL = os.getenv("FIREBASE_DB_URL")
+FIREBASE_CREDENTIALS_RAW = os.getenv("FIREBASE_CREDENTIALS")
+
+if FIREBASE_CREDENTIALS_RAW and FIREBASE_DB_URL:
+    try:
+        cred_dict = json.loads(FIREBASE_CREDENTIALS_RAW)
+        
+        # إصلاح أسطر المفتاح الخاص في حال تم تعويض \n كنص عادي
+        if "private_key" in cred_dict:
+            cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': FIREBASE_DB_URL
+        })
+        print("✅ تم الاتصال بـ Firebase Realtime Database بنجاح!")
+    except Exception as e:
+        print(f"❌ خطأ أثناء تهيئة Firebase: {e}")
+else:
+    print("⚠️ لم يتم العثور على FIREBASE_CREDENTIALS أو FIREBASE_DB_URL في متغيرات البيئة!")
+    
+# =========================================================
 # إعداد البوت
+# =========================================================
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-DATA_FILE = "user_profiles.json"
 
 # =========================================================
 # منطق ترجمة العربيزي (Hybrid Transliteration Engine)
@@ -87,27 +113,35 @@ def process_arabizi_text(text: str) -> str:
             
     return "".join(result)
 
-# --- إدارة البيانات ---
+# --- إدارة البيانات عن طريق Firebase ---
 def load_user_profiles():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    try:
+        ref = db.reference("user_profiles")
+        data = ref.get()
+        return data if data else {}
+    except Exception as e:
+        print(f"❌ خطأ عند جلب البيانات من Firebase: {e}")
+        return {}
 
 
 def update_user_field(user_id, field, value):
-    data = load_user_profiles()
-    user_str = str(user_id)
-    if user_str not in data:
-        data[user_str] = {
-            "gender": "Not Set",
-            "age": "Not Set",
-            "country": "Not Set",
-            "language": "en",
-        }
-    data[user_str][field] = value
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    try:
+        user_str = str(user_id)
+        ref = db.reference(f"user_profiles/{user_str}")
+        user_data = ref.get()
+        
+        if not user_data:
+            user_data = {
+                "gender": "Not Set",
+                "age": "Not Set",
+                "country": "Not Set",
+                "language": "en",
+            }
+        
+        user_data[field] = value
+        ref.set(user_data)
+    except Exception as e:
+        print(f"❌ خطأ عند تحديث البيانات في Firebase: {e}")
 
 
 # --- وظيفة ذكية لترجمة النصوص المخلطة والحفاظ على التنسيق والإيموجي ---
@@ -709,7 +743,6 @@ async def quick_translate(
 async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = None):
     target_text = text
 
-    # إذا لم يدخل المستخدم نصاً صريحاً، نبحث عن الرسالة المعمول لها Reply
     if not target_text:
         channel = interaction.channel
         target_msg = None
@@ -741,15 +774,12 @@ async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = No
 
     await interaction.response.defer(ephemeral=True)
 
-    # 1. تحويل العربيزي إلى العربية باستخدام المحرك الهجين
     arabic_text = process_arabizi_text(target_text)
 
-    # 2. معرفة لغة المستخدم المفضلة في البروفايل
     profiles = load_user_profiles()
     user_info = profiles.get(str(interaction.user.id), {})
     user_lang = user_info.get("language", "ar")
 
-    # 3. إذا كانت لغة المستخدم ليست العربية، نترجم النص العربي إلى لغته
     if user_lang != "ar":
         final_output = translate_smart_preserve_format(arabic_text, user_lang)
         response_msg = f"🔤 **الترجمة من العربيزي ({user_lang}):**\n\n{final_output}"
@@ -759,7 +789,6 @@ async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = No
     await interaction.followup.send(response_msg, ephemeral=True)
 
 
-# أمر مختصر للأرقام بنفس وظيفة ترجمة العربيزي (/3)
 @bot.tree.command(
     name="3", description="أمر مختصر لترجمة العربيزي إلى العربية"
 )
