@@ -821,47 +821,40 @@ async def quick_translate(
 
 
 # =========================================================
-# أمر ترجمة العربيزي (/arabizi أو /3)
+# أمر ترجمة العربيزي (/arabizi) - يعمل بالرد فقط (Reply)
 # =========================================================
 @bot.tree.command(
-    name="arabizi", description="ترجمة نص عربيزي إلى العربية (أو لغتك المحددة في البروفايل)"
+    name="arabizi", description="ترجمة رسالة عربيزي قمت بالرد عليها (Reply)"
 )
-@app_commands.describe(text="النص المراد تحويله من عربيزي (اختياري إذا أردت استخدام الرد Reply)")
-async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = None):
-    target_text = text
+async def translate_arabizi_cmd(interaction: discord.Interaction):
+    channel = interaction.channel
+    target_msg = None
 
-    if not target_text:
-        channel = interaction.channel
-        target_msg = None
+    if interaction.data.get("resolved", {}).get("messages"):
+        target_msg = list(interaction.data["resolved"]["messages"].values())[0]
 
-        if interaction.data.get("resolved", {}).get("messages"):
-            target_msg = list(interaction.data["resolved"]["messages"].values())[0]
+    try:
+        async for msg in channel.history(limit=10):
+            if (
+                msg.author.id == interaction.user.id
+                and msg.reference
+                and msg.reference.message_id
+            ):
+                target_msg = await channel.fetch_message(msg.reference.message_id)
+                break
+    except Exception:
+        pass
 
-        try:
-            async for msg in channel.history(limit=10):
-                if (
-                    msg.author.id == interaction.user.id
-                    and msg.reference
-                    and msg.reference.message_id
-                ):
-                    target_msg = await channel.fetch_message(msg.reference.message_id)
-                    break
-        except Exception:
-            pass
-
-        if target_msg and target_msg.content:
-            target_text = target_msg.content
-
-    if not target_text:
+    if not target_msg or not target_msg.content:
         await interaction.response.send_message(
-            "⚠️ يرجى استخدام الأمر كـ **رد (Reply)** على رسالة العربيزي، أو كتابة النص داخل خيار `text`!",
+            "⚠️ يرجى استخدام الأمر `/arabizi` كـ **رد (Reply)** على الرسالة التي تريد ترجمتها!",
             ephemeral=True,
         )
         return
 
     await interaction.response.defer(ephemeral=True)
 
-    arabic_text = process_arabizi_text(target_text)
+    arabic_text = process_arabizi_text(target_msg.content)
 
     user_info = get_user_profile(interaction.user.id)
     user_lang = user_info.get("language", "ar")
@@ -873,14 +866,6 @@ async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = No
         response_msg = f"🔤 **الترجمة من العربيزي:**\n\n{arabic_text}"
 
     await interaction.followup.send(response_msg, ephemeral=True)
-
-
-@bot.tree.command(
-    name="3", description="أمر مختصر لترجمة العربيزي إلى العربية"
-)
-@app_commands.describe(text="النص المراد تحويله من عربيزي (اختياري)")
-async def translate_arabizi_short(interaction: discord.Interaction, text: str = None):
-    await translate_arabizi_cmd(interaction, text)
 
 
 # --- أمر الترجمة بالزر الأيمن للفأرة (Context Menu) ---
