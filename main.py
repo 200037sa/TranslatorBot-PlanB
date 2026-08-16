@@ -123,6 +123,24 @@ def load_user_profiles():
         print(f"❌ خطأ عند جلب البيانات من Firebase: {e}")
         return {}
 
+def get_user_profile(user_id):
+    try:
+        ref = db.reference(f"user_profiles/{user_id}")
+        data = ref.get()
+        return data if data else {
+            "gender": "Not Set",
+            "age": "Not Set",
+            "country": "Not Set",
+            "language": "en",
+        }
+    except Exception as e:
+        print(f"❌ خطأ عند جلب بيانات المستخدم {user_id}: {e}")
+        return {
+            "gender": "Not Set",
+            "age": "Not Set",
+            "country": "Not Set",
+            "language": "en",
+        }
 
 def update_user_field(user_id, field, value):
     try:
@@ -142,7 +160,6 @@ def update_user_field(user_id, field, value):
         ref.set(user_data)
     except Exception as e:
         print(f"❌ خطأ عند تحديث البيانات في Firebase: {e}")
-
 
 # --- وظيفة ذكية لترجمة النصوص المخلطة والحفاظ على التنسيق والإيموجي ---
 def translate_smart_preserve_format(text: str, target_lang: str) -> str:
@@ -171,7 +188,6 @@ def translate_smart_preserve_format(text: str, target_lang: str) -> str:
             translated_lines.append(line)
 
     return "\n".join(translated_lines)
-
 
 # --- وظيفة مساعدة لإدارة الرتب التلقائية ---
 async def assign_profile_role(
@@ -230,8 +246,9 @@ async def assign_profile_role(
         except discord.Forbidden:
             print("❌ البوت لا يملك صلاحية إضافة الرتب للعضو.")
 
-
-# --- نصوص الواجهات باللغات المعتمدة ---
+# =========================================================
+# الترجمة الشاملة للنصوص والدول (i18n)
+# =========================================================
 TRANSLATIONS = {
     "ar": {
         "title": "📋 استبيان الأعضاء",
@@ -251,6 +268,15 @@ TRANSLATIONS = {
         "country_label": "الدولة",
         "edit_btn": "✏️ تعديل البيانات",
         "change_lang_btn": "🌐 تغيير اللغة فقط",
+        "not_set": "غير محدد",
+        "countries": {
+            "🇾🇪": "اليمن", "🇸🇦": "السعودية", "🇪🇬": "مصر", "🇩🇿": "الجزائر",
+            "🇵🇸": "فلسطين", "🇦🇪": "الإمارات", "🇮🇶": "العراق", "🇲🇦": "المغرب",
+            "🇹🇳": "تونس", "🇯🇴": "الأردن", "🇺🇸": "أمريكا", "🇪🇸": "إسبانيا",
+            "🇹🇷": "تركيا", "🇰🇷": "كوريا الجنوبية", "🇯🇵": "اليابان", "🇩🇪": "ألمانيا",
+            "🇫🇷": "فرنسا", "🇬🇧": "المملكة المتحدة", "🇷🇺": "روسيا", "🇨🇳": "الصين",
+            "🌐": "دولة أخرى"
+        }
     },
     "en": {
         "title": "📋 Member Profile Setup",
@@ -270,6 +296,15 @@ TRANSLATIONS = {
         "country_label": "Country",
         "edit_btn": "✏️ Edit Profile",
         "change_lang_btn": "🌐 Change Language Only",
+        "not_set": "Not Set",
+        "countries": {
+            "🇾🇪": "Yemen", "🇸🇦": "Saudi Arabia", "🇪🇬": "Egypt", "🇩🇿": "Algeria",
+            "🇵🇸": "Palestine", "🇦🇪": "UAE", "🇮🇶": "Iraq", "🇲🇦": "Morocco",
+            "🇹🇳": "Tunisia", "🇯🇴": "Jordan", "🇺🇸": "USA", "🇪🇸": "Spain",
+            "🇹🇷": "Turkey", "🇰🇷": "South Korea", "🇯🇵": "Japan", "🇩🇪": "Germany",
+            "🇫🇷": "France", "🇬🇧": "United Kingdom", "🇷🇺": "Russia", "🇨🇳": "China",
+            "🌐": "Other Country"
+        }
     },
     "ja": {
         "title": "📋 メンバープロフィール設定",
@@ -289,6 +324,15 @@ TRANSLATIONS = {
         "country_label": "国",
         "edit_btn": "✏️ プロフィール編集",
         "change_lang_btn": "🌐 言語のみ変更",
+        "not_set": "未設定",
+        "countries": {
+            "🇾🇪": "イエメン", "🇸🇦": "サウジアラビア", "🇪🇬": "エジプト", "🇩🇿": "アルジェリア",
+            "🇵🇸": "パレスチナ", "🇦🇪": "アラブ首長国連邦", "🇮🇶": "イラク", "🇲🇦": "モロッコ",
+            "🇹🇳": "チュニジア", "🇯🇴": "ヨルダン", "🇺🇸": "アメリカ", "🇪🇸": "スペイン",
+            "🇹🇷": "トルコ", "🇰🇷": "韓国", "🇯🇵": "日本", "🇩🇪": "ドイツ",
+            "🇫🇷": "フランス", "🇬🇧": "イギリス", "🇷🇺": "ロシア", "🇨🇳": "中国",
+            "🌐": "その他の国"
+        }
     },
     "es": {
         "title": "📋 Configuración de Perfil",
@@ -308,6 +352,15 @@ TRANSLATIONS = {
         "country_label": "País",
         "edit_btn": "✏️ Editar Perfil",
         "change_lang_btn": "🌐 Cambiar solo Idioma",
+        "not_set": "No establecido",
+        "countries": {
+            "🇾🇪": "Yemen", "🇸🇦": "Arabia Saudita", "🇪🇬": "Egipto", "🇩🇿": "Argelia",
+            "🇵🇸": "Palestina", "🇦🇪": "EAU", "🇮🇶": "Irak", "🇲🇦": "Marruecos",
+            "🇹🇳": "Túnez", "🇯🇴": "Jordania", "🇺🇸": "EE. UU.", "🇪🇸": "España",
+            "🇹🇷": "Turquía", "🇰🇷": "Corea del Sur", "🇯🇵": "Japón", "🇩🇪": "Alemania",
+            "🇫🇷": "Francia", "🇬🇧": "Reino Unido", "🇷🇺": "Rusia", "🇨🇳": "China",
+            "🌐": "Otro País"
+        }
     },
     "ko": {
         "title": "📋 프로필 설정",
@@ -327,6 +380,15 @@ TRANSLATIONS = {
         "country_label": "국가",
         "edit_btn": "✏️ 프로필 수정",
         "change_lang_btn": "🌐 언어만 변경",
+        "not_set": "설정되지 않음",
+        "countries": {
+            "🇾🇪": "예멘", "🇸🇦": "사우디아라비아", "🇪🇬": "이집트", "🇩🇿": "알제리",
+            "🇵🇸": "팔레스타인", "🇦🇪": "아랍에미리트", "🇮🇶": "이라크", "🇲🇦": "모로코",
+            "🇹🇳": "튀니지", "🇯🇴": "요르단", "🇺🇸": "미국", "🇪🇸": "스페인",
+            "🇹🇷": "튀르키예", "🇰🇷": "대한민국", "🇯🇵": "일본", "🇩🇪": "독일",
+            "🇫🇷": "프랑스", "🇬🇧": "영국", "🇷🇺": "러시아", "🇨🇳": "중국",
+            "🌐": "기타 국가"
+        }
     },
 }
 
@@ -341,42 +403,27 @@ AGE_ROLES = [
     "40+",
 ]
 
-COUNTRY_OPTIONS = [
-    {"label": "اليمن / Yemen", "emoji": "🇾🇪", "value": "🇾🇪"},
-    {"label": "السعودية / KSA", "emoji": "🇸🇦", "value": "🇸🇦"},
-    {"label": "مصر / Egypt", "emoji": "🇪🇬", "value": "🇪🇬"},
-    {"label": "الجزائر / Algeria", "emoji": "🇩🇿", "value": "🇩🇿"},
-    {"label": "فلسطين / Palestine", "emoji": "🇵🇸", "value": "🇵🇸"},
-    {"label": "الإمارات / UAE", "emoji": "🇦🇪", "value": "🇦🇪"},
-    {"label": "العراق / Iraq", "emoji": "🇮🇶", "value": "🇮🇶"},
-    {"label": "المغرب / Morocco", "emoji": "🇲🇦", "value": "🇲🇦"},
-    {"label": "تونس / Tunisia", "emoji": "🇹🇳", "value": "🇹🇳"},
-    {"label": "الأردن / Jordan", "emoji": "🇯🇴", "value": "🇯🇴"},
-    {"label": "أمريكا / USA", "emoji": "🇺🇸", "value": "🇺🇸"},
-    {"label": "إسبانيا / Spain", "emoji": "🇪🇸", "value": "🇪🇸"},
-    {"label": "تركيا / Turkey", "emoji": "🇹🇷", "value": "🇹🇷"},
-    {"label": "كوريا / Korea", "emoji": "🇰🇷", "value": "🇰🇷"},
-    {"label": "اليابان / Japan", "emoji": "🇯🇵", "value": "🇯🇵"},
-    {"label": "ألمانيا / Germany", "emoji": "🇩🇪", "value": "🇩🇪"},
-    {"label": "فرنسا / France", "emoji": "🇫🇷", "value": "🇫🇷"},
-    {"label": "المملكة المتحدة / UK", "emoji": "🇬🇧", "value": "🇬🇧"},
-    {"label": "روسيا / Russia", "emoji": "🇷🇺", "value": "🇷🇺"},
-    {"label": "الصين / China", "emoji": "🇨🇳", "value": "🇨🇳"},
-    {"label": "دولة أخرى / Other", "emoji": "🌐", "value": "🌐"},
+COUNTRY_CODES = [
+    "🇾🇪", "🇸🇦", "🇪🇬", "🇩🇿", "🇵🇸", "🇦🇪", "🇮🇶", "🇲🇦", "🇹🇳", "🇯🇴",
+    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🌐"
 ]
 
-COUNTRY_ROLES = [c["value"] for c in COUNTRY_OPTIONS]
+COUNTRY_ROLES = COUNTRY_CODES
 
-
-# --- القوائم المنسدلة ---
+# --- القوائم المنسدلة الذكية مع دعم التحديد المسبق ---
 class GenderSelect(discord.ui.Select):
 
-    def __init__(self, lang):
+    def __init__(self, lang: str, current_val: str = None):
         self.lang = lang
         t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+        
         options = [
-            discord.SelectOption(label=t["gender_m"], emoji="♂️", value="♂️"),
-            discord.SelectOption(label=t["gender_f"], emoji="♀️", value="♀️"),
+            discord.SelectOption(
+                label=t["gender_m"], emoji="♂️", value="♂️", default=(current_val == "♂️")
+            ),
+            discord.SelectOption(
+                label=t["gender_f"], emoji="♀️", value="♀️", default=(current_val == "♀️")
+            ),
         ]
         super().__init__(
             placeholder=t["gender_ph"],
@@ -406,11 +453,14 @@ class GenderSelect(discord.ui.Select):
 
 class AgeSelect(discord.ui.Select):
 
-    def __init__(self, lang):
+    def __init__(self, lang: str, current_val: str = None):
         self.lang = lang
         t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+        
         options = [
-            discord.SelectOption(label=age, value=age) for age in AGE_ROLES
+            discord.SelectOption(
+                label=age, value=age, default=(current_val == age)
+            ) for age in AGE_ROLES
         ]
         super().__init__(
             placeholder=t["age_ph"],
@@ -434,14 +484,19 @@ class AgeSelect(discord.ui.Select):
 
 class CountrySelect(discord.ui.Select):
 
-    def __init__(self, lang):
+    def __init__(self, lang: str, current_val: str = None):
         self.lang = lang
         t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+        country_dict = t.get("countries", TRANSLATIONS["en"]["countries"])
+
         options = [
             discord.SelectOption(
-                label=c["label"], emoji=c["emoji"], value=c["value"]
+                label=country_dict.get(code, code),
+                emoji=code,
+                value=code,
+                default=(current_val == code)
             )
-            for c in COUNTRY_OPTIONS
+            for code in COUNTRY_CODES
         ]
         super().__init__(
             placeholder=t["country_ph"],
@@ -467,18 +522,31 @@ class CountrySelect(discord.ui.Select):
 
 class DetailsSurveyView(discord.ui.View):
 
-    def __init__(self, lang):
+    def __init__(self, lang: str, user_profile: dict = None):
         super().__init__(timeout=None)
-        self.add_item(GenderSelect(lang))
-        self.add_item(AgeSelect(lang))
-        self.add_item(CountrySelect(lang))
+        user_profile = user_profile or {}
+        
+        curr_gender = user_profile.get("gender")
+        curr_age = user_profile.get("age")
+        curr_country = user_profile.get("country")
+
+        self.add_item(GenderSelect(lang, curr_gender))
+        self.add_item(AgeSelect(lang, curr_age))
+        self.add_item(CountrySelect(lang, curr_country))
 
 
 # --- واجهة أزرار اختيار اللغة الأساسية ---
 class LanguageButtonView(discord.ui.View):
 
-    def __init__(self):
+    def __init__(self, current_lang: str = None):
         super().__init__(timeout=None)
+        
+        # إذا تم تزويد اللغة الحالية، نقوم بتمييز الزر الخاص بها
+        if current_lang:
+            for item in self.children:
+                if isinstance(item, discord.ui.Button):
+                    if item.custom_id == f"btn_{current_lang}":
+                        item.style = discord.ButtonStyle.success
 
     async def handle_lang_click(
         self, interaction: discord.Interaction, lang_code: str
@@ -490,14 +558,15 @@ class LanguageButtonView(discord.ui.View):
             description="Fill your profile options below:",
             color=discord.Color.green(),
         )
+        user_data = get_user_profile(interaction.user.id)
         await interaction.response.send_message(
-            embed=embed, view=DetailsSurveyView(lang_code), ephemeral=True
+            embed=embed, view=DetailsSurveyView(lang_code, user_data), ephemeral=True
         )
 
     @discord.ui.button(
         label="English",
         emoji="🇺🇸",
-        style=discord.ButtonStyle.primary,
+        style=discord.ButtonStyle.secondary,
         custom_id="btn_en",
     )
     async def btn_en(
@@ -553,12 +622,23 @@ class LanguageButtonView(discord.ui.View):
 # --- واجهة إدارة البروفايل ---
 class ProfileManageView(discord.ui.View):
 
-    def __init__(self, user_lang: str):
+    def __init__(self, user_lang: str, user_data: dict = None):
         super().__init__(timeout=None)
         self.user_lang = user_lang
+        self.user_data = user_data or {}
+        
+        t = TRANSLATIONS.get(user_lang, TRANSLATIONS["en"])
+        
+        # لتحديث نصوص الأزرار لتطابق لغة البروفايل المحددة
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                if item.custom_id == "btn_edit_profile":
+                    item.label = t["edit_btn"]
+                elif item.custom_id == "btn_change_lang":
+                    item.label = t["change_lang_btn"]
 
     @discord.ui.button(
-        label="✏️ Edit Profile",
+        label="Edit Profile",
         style=discord.ButtonStyle.primary,
         custom_id="btn_edit_profile",
     )
@@ -571,12 +651,13 @@ class ProfileManageView(discord.ui.View):
             description="Select your updated information:",
             color=discord.Color.blue(),
         )
+        user_data = get_user_profile(interaction.user.id)
         await interaction.response.send_message(
-            embed=embed, view=DetailsSurveyView(self.user_lang), ephemeral=True
+            embed=embed, view=DetailsSurveyView(self.user_lang, user_data), ephemeral=True
         )
 
     @discord.ui.button(
-        label="🌐 Change Language",
+        label="Change Language",
         style=discord.ButtonStyle.secondary,
         custom_id="btn_change_lang",
     )
@@ -589,7 +670,7 @@ class ProfileManageView(discord.ui.View):
             color=discord.Color.gold(),
         )
         await interaction.response.send_message(
-            embed=embed, view=LanguageButtonView(), ephemeral=True
+            embed=embed, view=LanguageButtonView(current_lang=self.user_lang), ephemeral=True
         )
 
 
@@ -612,7 +693,7 @@ async def on_ready():
 @bot.event
 async def on_member_join(member: discord.Member):
     embed = discord.Embed(
-        title="🌐 Choose Your Language / اختر لغتك",
+        title="🌐 Choose Your Language",
         description="Select your preferred language to start setting up your profile & enable instant translation!",
         color=discord.Color.blue(),
     )
@@ -627,19 +708,26 @@ async def on_member_join(member: discord.Member):
     name="profile", description="عرض وتعديل بيانات ملفك الشخصي ولغتك المفضلة"
 )
 async def view_profile(interaction: discord.Interaction):
-    profiles = load_user_profiles()
-    user_data = profiles.get(
-        str(interaction.user.id),
-        {
-            "gender": "Not Set",
-            "age": "Not Set",
-            "country": "Not Set",
-            "language": "en",
-        },
-    )
+    user_data = get_user_profile(interaction.user.id)
 
     lang = user_data.get("language", "en")
     t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+
+    country_code = user_data.get("country", "Not Set")
+    country_dict = t.get("countries", TRANSLATIONS["en"]["countries"])
+    display_country = country_dict.get(country_code, country_code if country_code != "Not Set" else t["not_set"])
+
+    gender_val = user_data.get("gender", "Not Set")
+    if gender_val == "♂️":
+        display_gender = t["gender_m"]
+    elif gender_val == "♀️":
+        display_gender = t["gender_f"]
+    else:
+        display_gender = t["not_set"]
+
+    age_val = user_data.get("age", t["not_set"])
+    if age_val == "Not Set":
+        age_val = t["not_set"]
 
     embed = discord.Embed(
         title=t["profile_title"],
@@ -656,22 +744,22 @@ async def view_profile(interaction: discord.Interaction):
     )
     embed.add_field(
         name=f"👤 {t['gender_label']}",
-        value=user_data.get("gender", "Not Set"),
+        value=display_gender,
         inline=True,
     )
     embed.add_field(
         name=f"🎂 {t['age_label']}",
-        value=user_data.get("age", "Not Set"),
+        value=age_val,
         inline=True,
     )
     embed.add_field(
         name=f"🚩 {t['country_label']}",
-        value=user_data.get("country", "Not Set"),
+        value=display_country,
         inline=True,
     )
 
     await interaction.response.send_message(
-        embed=embed, view=ProfileManageView(lang), ephemeral=True
+        embed=embed, view=ProfileManageView(lang, user_data), ephemeral=True
     )
 
 
@@ -717,8 +805,7 @@ async def quick_translate(
     if target_language:
         final_lang = target_language.lower().strip()
     else:
-        profiles = load_user_profiles()
-        user_info = profiles.get(str(interaction.user.id), {})
+        user_info = get_user_profile(interaction.user.id)
         final_lang = user_info.get("language", "en")
 
     try:
@@ -776,8 +863,7 @@ async def translate_arabizi_cmd(interaction: discord.Interaction, text: str = No
 
     arabic_text = process_arabizi_text(target_text)
 
-    profiles = load_user_profiles()
-    user_info = profiles.get(str(interaction.user.id), {})
+    user_info = get_user_profile(interaction.user.id)
     user_lang = user_info.get("language", "ar")
 
     if user_lang != "ar":
@@ -809,8 +895,7 @@ async def translate_message(
         return
 
     await interaction.response.defer(ephemeral=True)
-    profiles = load_user_profiles()
-    user_info = profiles.get(str(interaction.user.id), {})
+    user_info = get_user_profile(interaction.user.id)
     target_lang = user_info.get("language", "en")
 
     try:
