@@ -5,6 +5,9 @@ import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
+import firebase_admin
+from firebase_admin import credentials, db
+from locales import get_text
 
 
 # =========================================================
@@ -13,85 +16,62 @@ from discord.ext import commands
 
 GAMES_CHANNEL_ID = 1537949579457339483
 GAMES_CHANNEL_URL = "https://discord.com/channels/1529585792194707609/1537949579457339483"
-DATA_FILE = "user_profiles.json"
 ALLOWED_GAME_COMMANDS = {"xo", "rps", "connect4", "games"}
 
 
 # =========================================================
-# جلب لغة المستخدم (اللغة الافتراضية: الإنجليزية)
+# إعداد Firebase Realtime Database
+# =========================================================
+
+FIREBASE_DB_URL = os.getenv("FIREBASE_DB_URL")
+FIREBASE_CREDENTIALS_RAW = os.getenv("FIREBASE_CREDENTIALS")
+
+if FIREBASE_CREDENTIALS_RAW and FIREBASE_DB_URL:
+    try:
+        cred_dict = json.loads(FIREBASE_CREDENTIALS_RAW)
+        if "private_key" in cred_dict:
+            cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_DB_URL})
+        print("✅ Connected to Firebase Realtime Database successfully!")
+    except Exception as e:
+        print(f"❌ Firebase initialization error: {e}")
+else:
+    print("⚠️ FIREBASE_CREDENTIALS or FIREBASE_DB_URL not found!")
+
+
+# =========================================================
+# جلب لغة المستخدم من Firebase
 # =========================================================
 
 def get_user_lang(user_id: int) -> str:
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
+    """جلب لغة المستخدم مباشرة من Firebase Realtime Database"""
+    try:
+        ref = db.reference(f"users/{user_id}/language")
+        lang = ref.get()
 
-            lang = data.get(str(user_id), {}).get("language", "en")
-
-            if lang in ("ar", "en", "es", "ja", "ko"):
-                return lang
-
-        except Exception:
-            pass
+        if lang in ("ar", "en", "es", "ja", "ko" , "bg"):
+            return lang
+    except Exception as e:
+        print(f"⚠️ Error fetching language for {user_id} from Firebase: {e}")
 
     return "en"
 
 
-# =========================================================
-# النصوص
-# =========================================================
-
-TEXTS = {
-    "en": {
-        "xo_title": "Tic-Tac-Toe",
-        "rps_title": "Rock Paper Scissors",
-        "c4_title": "Connect Four",
-        "winner": "Winner",
-        "loser": "Loser",
-        "draw": "Draw",
-    },
-    "ar": {
-        "xo_title": "إكس أوه",
-        "rps_title": "حجرة ورقة مقص",
-        "c4_title": "أربع تربح",
-        "winner": "الفائز",
-        "loser": "الخاسر",
-        "draw": "تعادل",
-    },
-    "es": {
-        "xo_title": "Tres en Raya",
-        "rps_title": "Piedra Papel Tijeras",
-        "c4_title": "Conecta Cuatro",
-        "winner": "Ganador",
-        "loser": "Perdedor",
-        "draw": "Empate",
-    },
-    "ja": {
-        "xo_title": "○×ゲーム",
-        "rps_title": "じゃんけん",
-        "c4_title": "コネクトフォー",
-        "winner": "勝者",
-        "loser": "敗者",
-        "draw": "引き分け",
-    },
-    "ko": {
-        "xo_title": "틱택토",
-        "rps_title": "가위바위보",
-        "c4_title": "커넥트 포",
-        "winner": "승자",
-        "loser": "패자",
-        "draw": "무승부",
-    },
-}
-
-
-def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
+def get_bi_text(p1_id: int, p2_id: int, key: str, bot_id: int = None) -> str:
     lang1 = get_user_lang(p1_id)
     lang2 = get_user_lang(p2_id)
 
-    text1 = TEXTS.get(lang1, TEXTS["en"]).get(key, "")
-    text2 = TEXTS.get(lang2, TEXTS["en"]).get(key, "")
+    # إذا كان أحد الطرفين هو البوت، نطبق نفس لغة اللاعب الحقيقي
+    if bot_id:
+        if p1_id == bot_id:
+            lang1 = lang2
+        elif p2_id == bot_id:
+            lang2 = lang1
+
+    text1 = get_text(lang1, key)
+    text2 = get_text(lang2, key)
 
     if lang1 == lang2:
         return text1
@@ -104,11 +84,12 @@ def get_bi_text(p1_id: int, p2_id: int, key: str) -> str:
 # =========================================================
 
 class GoToGamesChannelView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, user_lang: str):
         super().__init__(timeout=None)
+        btn_label = get_text(user_lang, "go_to_games_btn")
         self.add_item(
             discord.ui.Button(
-                label="🧩 الانتقال إلى روم الألعاب / Go to Games",
+                label=btn_label,
                 url=GAMES_CHANNEL_URL,
                 style=discord.ButtonStyle.link,
             )
@@ -118,10 +99,11 @@ class GoToGamesChannelView(discord.ui.View):
 async def check_games_channel(interaction: discord.Interaction) -> bool:
     """تحقق مما إذا كان المستخدم داخل روم الألعاب أم لا"""
     if interaction.channel_id != GAMES_CHANNEL_ID:
+        user_lang = get_user_lang(interaction.user.id)
+        msg_text = get_text(user_lang, "games_channel_only")
         await interaction.response.send_message(
-            "⚠️ **عذراً، هذه الأوامر مخصصة فقط لقناة الألعاب!**\n"
-            "Sorry, these commands can only be used in the games channel!",
-            view=GoToGamesChannelView(),
+            msg_text,
+            view=GoToGamesChannelView(user_lang),
             ephemeral=True,
         )
         return False
@@ -195,6 +177,7 @@ class TicTacToeView(discord.ui.View):
         return all(cell != 0 for row in self.board for cell in row)
 
     async def process_turn(self, interaction: discord.Interaction, button: TicTacToeButton):
+        bot_id = interaction.client.user.id
         if self.current_player == self.player1:
             button.label = "❌"
             button.style = discord.ButtonStyle.danger
@@ -207,7 +190,7 @@ class TicTacToeView(discord.ui.View):
             next_player = self.player1
 
         button.disabled = True
-        title = get_bi_text(self.player1.id, self.player2.id, "xo_title")
+        title = get_bi_text(self.player1.id, self.player2.id, "xo_title", bot_id=bot_id)
         winner = self.check_winner()
 
         if winner:
@@ -215,8 +198,8 @@ class TicTacToeView(discord.ui.View):
                 child.disabled = True
 
             loser = self.player2 if winner == self.player1 else self.player1
-            winner_label = get_bi_text(self.player1.id, self.player2.id, "winner")
-            loser_label = get_bi_text(self.player1.id, self.player2.id, "loser")
+            winner_label = get_bi_text(self.player1.id, self.player2.id, "winner", bot_id=bot_id)
+            loser_label = get_bi_text(self.player1.id, self.player2.id, "loser", bot_id=bot_id)
             winner_symbol = "❌" if winner == self.player1 else "⭕"
             loser_symbol = "❌" if loser == self.player1 else "⭕"
 
@@ -239,7 +222,7 @@ class TicTacToeView(discord.ui.View):
             for child in self.children:
                 child.disabled = True
 
-            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw")
+            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw", bot_id=bot_id)
             content = (
                 f"{title}\n\n"
                 f"{draw_label}\n\n"
@@ -267,7 +250,6 @@ class TicTacToeView(discord.ui.View):
         else:
             await interaction.response.edit_message(content=content, view=self)
 
-        # إذا كان الدور على البوت، يلعب عشوائياً
         if self.current_player.bot:
             await asyncio.sleep(1)
             available_buttons = [b for b in self.children if isinstance(b, TicTacToeButton) and not b.disabled]
@@ -288,7 +270,6 @@ class RPSView(discord.ui.View):
         self.player2 = player2
         self.choices = {}
 
-        # اختيار عشوائي للبوت مسبقاً إذا كان مشاركاً
         if self.player2.bot:
             self.choices[self.player2.id] = random.choice(["rock", "paper", "scissors"])
 
@@ -319,6 +300,7 @@ class RPSView(discord.ui.View):
         if len(self.choices) < 2:
             return
 
+        bot_id = interaction.client.user.id
         c1 = self.choices[self.player1.id]
         c2 = self.choices[self.player2.id]
         emoji_map = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
@@ -326,10 +308,10 @@ class RPSView(discord.ui.View):
         for child in self.children:
             child.disabled = True
 
-        title = get_bi_text(self.player1.id, self.player2.id, "rps_title")
+        title = get_bi_text(self.player1.id, self.player2.id, "rps_title", bot_id=bot_id)
 
         if c1 == c2:
-            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw")
+            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw", bot_id=bot_id)
             content = (
                 f"{title}\n\n"
                 f"{self.player1.mention} {emoji_map[c1]} VS {self.player2.mention} {emoji_map[c2]}\n\n"
@@ -353,8 +335,8 @@ class RPSView(discord.ui.View):
             winner, loser = self.player2, self.player1
             winner_choice, loser_choice = c2, c1
 
-        winner_label = get_bi_text(self.player1.id, self.player2.id, "winner")
-        loser_label = get_bi_text(self.player1.id, self.player2.id, "loser")
+        winner_label = get_bi_text(self.player1.id, self.player2.id, "winner", bot_id=bot_id)
+        loser_label = get_bi_text(self.player1.id, self.player2.id, "loser", bot_id=bot_id)
 
         content = (
             f"{title}\n\n"
@@ -409,6 +391,7 @@ class ConnectFourView(discord.ui.View):
             await view.process_turn(interaction, self.col)
 
     async def process_turn(self, interaction: discord.Interaction, col: int):
+        bot_id = interaction.client.user.id
         row_to_place = -1
         for r in range(5, -1, -1):
             if self.board[r][col] == 0:
@@ -423,7 +406,7 @@ class ConnectFourView(discord.ui.View):
         piece = 1 if self.current_player == self.player1 else 2
         self.board[row_to_place][col] = piece
 
-        title = get_bi_text(self.player1.id, self.player2.id, "c4_title")
+        title = get_bi_text(self.player1.id, self.player2.id, "c4_title", bot_id=bot_id)
 
         if self.check_win(piece):
             for child in self.children:
@@ -431,8 +414,8 @@ class ConnectFourView(discord.ui.View):
 
             winner = self.current_player
             loser = self.player2 if winner == self.player1 else self.player1
-            winner_label = get_bi_text(self.player1.id, self.player2.id, "winner")
-            loser_label = get_bi_text(self.player1.id, self.player2.id, "loser")
+            winner_label = get_bi_text(self.player1.id, self.player2.id, "winner", bot_id=bot_id)
+            loser_label = get_bi_text(self.player1.id, self.player2.id, "loser", bot_id=bot_id)
             winner_symbol = "🔴" if winner == self.player1 else "🟡"
             loser_symbol = "🔴" if loser == self.player1 else "🟡"
 
@@ -452,7 +435,6 @@ class ConnectFourView(discord.ui.View):
             self.stop()
             return
 
-        # تعطيل أزرار الأعمدة الممتلئة بالكامل (7 خيارات تقل عند امتلاء العمود)
         for child in self.children:
             if isinstance(child, self.ColButton):
                 if self.board[0][child.col] != 0:
@@ -462,7 +444,7 @@ class ConnectFourView(discord.ui.View):
             for child in self.children:
                 child.disabled = True
 
-            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw")
+            draw_label = get_bi_text(self.player1.id, self.player2.id, "draw", bot_id=bot_id)
             msg = (
                 f"{self.render_board()}\n\n"
                 f"{title}\n\n"
@@ -492,7 +474,6 @@ class ConnectFourView(discord.ui.View):
         else:
             await interaction.response.edit_message(content=msg, view=self)
 
-        # إذا كان الدور على البوت، يختار عموداً متاحاً عشوائياً
         if self.current_player.bot:
             await asyncio.sleep(1)
             valid_cols = [c for c in range(7) if self.board[0][c] == 0]
@@ -542,65 +523,60 @@ class GamesCog(commands.Cog):
 
     @app_commands.command(
         name="games",
-        description="Show available server games and instructions / عرض قائمة الألعاب والشرح"
+        description="Show available server games and instructions"
     )
     async def games_menu(self, interaction: discord.Interaction):
         if not await check_games_channel(interaction):
             return
 
+        u_lang = get_user_lang(interaction.user.id)
+
         embed = discord.Embed(
-            title="🎮 قائمة ألعاب السيرفر / Server Games",
-            description="مرحباً بك في قسم الألعاب! يمكنك منافسة الأعضاء باستخدام الأوامر التالية:",
+            title=get_text(u_lang, "games_menu_title"),
+            description=get_text(u_lang, "games_menu_desc"),
             color=discord.Color.purple()
         )
 
         embed.add_field(
-            name="❌⭕ 1. لعبة إكس أوه (/xo)",
-            value=(
-                "**الاستخدام:** `/xo @User`\n"
-                "**الشرح:** لعبة Tic-Tac-Toe المعروفة. تناوب مع خصمك على إكمال خط من 3 رمور (أفقياً، عمودياً، أو قطرياً) لتمكين الفوز."
-            ),
+            name=f"❌⭕ 1. {get_text(u_lang, 'xo_title')}",
+            value=get_text(u_lang, "xo_cmd_desc"),
             inline=False
         )
 
         embed.add_field(
-            name="🪨📄✂️ 2. حجرة ورقة مقص (/rps)",
-            value=(
-                "**الاستخدام:** `/rps @User`\n"
-                "**الشرح:** اخترا خياراتكما سرا بالضغط على الأزرار. الحجرة تهزم المقص، والمقص يهزم الورقة، والورقة تهزم الحجرة."
-            ),
+            name=f"🪨📄✂️ 2. {get_text(u_lang, 'rps_title')}",
+            value=get_text(u_lang, "rps_cmd_desc"),
             inline=False
         )
 
         embed.add_field(
-            name="🔴🟡 3. لعبة أربع تربح (/connect4)",
-            value=(
-                "**الاستخدام:** `/connect4 @User`\n"
-                "**الشرح:** اختر العمود (1-7) لإسقاط القرص الخاص بك. أول لاعب يجمع 4 أقراص متتالية في أي اتجاه يفوز."
-            ),
+            name=f"🔴🟡 3. {get_text(u_lang, 'c4_title')}",
+            value=get_text(u_lang, "c4_cmd_desc"),
             inline=False
         )
 
-        embed.set_footer(text="ملاحظة: جميع الأوامر تعمل حصرياً في هذه القناة.")
+        embed.set_footer(text=get_text(u_lang, "games_footer"))
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="xo",
-        description="Start a Tic-Tac-Toe game / بدء لعبة إكس أوه"
+        description="Start a Tic-Tac-Toe game"
     )
     async def xo(self, interaction: discord.Interaction, opponent: discord.User):
         if not await check_games_channel(interaction):
             return
 
+        u_lang = get_user_lang(interaction.user.id)
+
         if opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                "❌ لا يمكنك اللعب ضد نفسك!", ephemeral=True
+                get_text(u_lang, "cant_play_self"), ephemeral=True
             )
             return
 
         view = TicTacToeView(interaction.user, opponent)
-        title = get_bi_text(interaction.user.id, opponent.id, "xo_title")
+        title = get_bi_text(interaction.user.id, opponent.id, "xo_title", bot_id=self.bot.user.id)
 
         msg = (
             f"{title}\n\n"
@@ -612,20 +588,22 @@ class GamesCog(commands.Cog):
 
     @app_commands.command(
         name="rps",
-        description="Start Rock Paper Scissors / بدء لعبة حجرة ورقة مقص"
+        description="Start Rock Paper Scissors"
     )
     async def rps(self, interaction: discord.Interaction, opponent: discord.User):
         if not await check_games_channel(interaction):
             return
 
+        u_lang = get_user_lang(interaction.user.id)
+
         if opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                "❌ لا يمكنك اللعب ضد نفسك!", ephemeral=True
+                get_text(u_lang, "cant_play_self"), ephemeral=True
             )
             return
 
         view = RPSView(interaction.user, opponent)
-        title = get_bi_text(interaction.user.id, opponent.id, "rps_title")
+        title = get_bi_text(interaction.user.id, opponent.id, "rps_title", bot_id=self.bot.user.id)
 
         msg = (
             f"{title}\n\n"
@@ -636,20 +614,22 @@ class GamesCog(commands.Cog):
 
     @app_commands.command(
         name="connect4",
-        description="Start a Connect Four game / بدء لعبة أربع تربح"
+        description="Start a Connect Four game"
     )
     async def connect4(self, interaction: discord.Interaction, opponent: discord.User):
         if not await check_games_channel(interaction):
             return
 
+        u_lang = get_user_lang(interaction.user.id)
+
         if opponent.id == interaction.user.id:
             await interaction.response.send_message(
-                "❌ لا يمكنك اللعب ضد نفسك!", ephemeral=True
+                get_text(u_lang, "cant_play_self"), ephemeral=True
             )
             return
 
         view = ConnectFourView(interaction.user, opponent)
-        title = get_bi_text(interaction.user.id, opponent.id, "c4_title")
+        title = get_bi_text(interaction.user.id, opponent.id, "c4_title", bot_id=self.bot.user.id)
 
         msg = (
             f"{view.render_board()}\n\n"
@@ -668,14 +648,17 @@ class GamesCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = GamesCog(bot)
 
+    @bot.tree.interaction_check
     async def global_interaction_check(interaction: discord.Interaction) -> bool:
         if interaction.channel_id == GAMES_CHANNEL_ID:
             cmd_name = interaction.command.name if interaction.command else None
-            if cmd_name not in ALLOWED_GAME_COMMANDS:
-                if not interaction.response.is_done():
-                    await interaction.response.defer()
+            if cmd_name and cmd_name not in ALLOWED_GAME_COMMANDS:
+                user_lang = get_user_lang(interaction.user.id)
+                await interaction.response.send_message(
+                    get_text(user_lang, "not_allowed_command"),
+                    ephemeral=True
+                )
                 return False
         return True
 
-    bot.check_once(global_interaction_check)
     await bot.add_cog(cog)

@@ -1,0 +1,27 @@
+تعليمات
+اذا اردت اضافة لغة قم بالتغير في 
+main.py
+    @discord.ui.button(label="English", emoji="🇺🇸", style=discord.ButtonStyle.secondary, custom_id="btn_en")
+    async def btn_en(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_lang_click(interaction, "en")
+
+COUNTRY_CODES = [
+    "🇾🇪", "🇸🇦", "🇪🇬", "🇩🇿", "🇵🇸", "🇦🇪", "🇮🇶", "🇲🇦", "🇹🇳", "🇯🇴",
+    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🌐"
+]
+
+games.py
+def get_user_lang(user_id: int) -> str:
+    """جلب لغة المستخدم مباشرة من Firebase Realtime Database"""
+    try:
+        ref = db.reference(f"users/{user_id}/language")
+        lang = ref.get()
+
+        if lang in ("ar", "en", "es", "ja", "ko"):
+            return lang
+    except Exception as e:
+        print(f"⚠️ Error fetching language for {user_id} from Firebase: {e}")
+
+    return "en"
+
+locales.py
