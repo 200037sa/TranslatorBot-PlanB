@@ -436,39 +436,47 @@ async def view_profile(interaction: discord.Interaction):
 # --- أمر السلاش الموحد للترجمة بالرد (Slash Command /t) ---
 @bot.tree.command(name="t", description="Translate replied message to your set language or specified target language")
 @app_commands.describe(
-    target_language="Language code to translate to (optional, e.g., ar, en, es)"
+    target_language="Language code to translate to (e.g. ar, en, ja, es)"
 )
 async def quick_translate(interaction: discord.Interaction, target_language: str = None):
     user_info = get_user_profile(interaction.user.id)
     user_lang = user_info.get("language", "en")
+    
+    # تحديد اللغة المستهدفة
     final_lang = target_language.lower().strip() if target_language else user_lang
 
     channel = interaction.channel
     target_msg = None
 
-    # 1. محاولة جلب الرسالة المردود عليها مباشرة من بيانات الـ Interaction (إن وجدت)
+    # 1. البحث عن الرسالة المردود عليها بدقة من تاريخ القناة
     try:
-        data = interaction.data
-        # إذا قام المستخدم بعمل Reply، يقوم ديسكورد بتضمين message_id داخل الـ data الخاصة بالـ Interaction
-        referenced_id = data.get("resolved", {}).get("messages", {})
-        if referenced_id:
-            msg_id = list(referenced_id.keys())[0]
-            target_msg = await channel.fetch_message(int(msg_id))
-    except Exception:
-        pass
+        # نبحث في آخر 20 رسالة في القناة
+        async for msg in channel.history(limit=20):
+            # نبحث عن رسالة الرد الخاصة بالمستخدم التي استدعت هذا التفاعل
+            if msg.author.id == interaction.user.id and msg.reference and msg.reference.message_id:
+                target_msg = await channel.fetch_message(msg.reference.message_id)
+                
+                # فحص إضافي: إذا كتب المستخدم كود اللغة كـ النص في الرد نفسه مثل "/t ja" ولم يمرره كـ Option
+                content_clean = msg.content.strip().lower()
+                if content_clean.startswith("/t "):
+                    possible_lang = content_clean.replace("/t ", "").strip()
+                    if possible_lang:
+                        final_lang = possible_lang
+                break
+    except Exception as e:
+        print(f"⚠️ Error fetching referenced message: {e}")
 
-    # 2. في حال عدم العثور عليها بالطريقة الأولى، نبحث في السجل عن آخر رسالة تسبق استخدام الأمر
+    # 2. في حال عدم العثور عليها عبر الـ History (خيار احتياطي للرسالة المباشرة السابقة)
     if not target_msg:
         try:
             async for msg in channel.history(limit=5):
-                # التجاوز عن رسائل البوت الفورية
-                if msg.author.id != interaction.user.id:
+                if msg.author.id != bot.user.id and not msg.content.startswith("/t"):
                     target_msg = msg
                     break
         except Exception as e:
-            print(f"⚠️ Error fetching referenced message: {e}")
+            print(f"⚠️ Backup fetch error: {e}")
 
-    # إذا لم يتم العثور على أي نص
+    # إذا لم يتم العثور على أي رسالة تحتوي نصاً
     if not target_msg or not target_msg.content:
         await interaction.response.send_message(
             get_text(user_lang, "reply_error"),
