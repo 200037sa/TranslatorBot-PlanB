@@ -446,16 +446,29 @@ async def quick_translate(interaction: discord.Interaction, target_language: str
     channel = interaction.channel
     target_msg = None
 
-    # البحث عن الرسالة التي قام المستخدم بالرد عليها (Reply)
+    # 1. محاولة جلب الرسالة المردود عليها مباشرة من بيانات الـ Interaction (إن وجدت)
     try:
-        async for msg in channel.history(limit=15):
-            if msg.author.id == interaction.user.id and msg.reference and msg.reference.message_id:
-                target_msg = await channel.fetch_message(msg.reference.message_id)
-                break
-    except Exception as e:
-        print(f"⚠️ Error fetching referenced message: {e}")
+        data = interaction.data
+        # إذا قام المستخدم بعمل Reply، يقوم ديسكورد بتضمين message_id داخل الـ data الخاصة بالـ Interaction
+        referenced_id = data.get("resolved", {}).get("messages", {})
+        if referenced_id:
+            msg_id = list(referenced_id.keys())[0]
+            target_msg = await channel.fetch_message(int(msg_id))
+    except Exception:
+        pass
 
-    # إذا لم يقم بالمستخدم بالرد على أي رسالة
+    # 2. في حال عدم العثور عليها بالطريقة الأولى، نبحث في السجل عن آخر رسالة تسبق استخدام الأمر
+    if not target_msg:
+        try:
+            async for msg in channel.history(limit=5):
+                # التجاوز عن رسائل البوت الفورية
+                if msg.author.id != interaction.user.id:
+                    target_msg = msg
+                    break
+        except Exception as e:
+            print(f"⚠️ Error fetching referenced message: {e}")
+
+    # إذا لم يتم العثور على أي نص
     if not target_msg or not target_msg.content:
         await interaction.response.send_message(
             get_text(user_lang, "reply_error"),
@@ -467,13 +480,11 @@ async def quick_translate(interaction: discord.Interaction, target_language: str
 
     try:
         translated_text = translate_smart_preserve_format(target_msg.content, final_lang)
-        # إرسال النص المترجم مباشرة بدون البادئة
         await interaction.followup.send(translated_text, ephemeral=True)
     except Exception as e:
         err_msg = get_text(user_lang, "trans_error")
         await interaction.followup.send(f"{err_msg} {e}", ephemeral=True)
-
-
+        
 # --- أمر سياق الخيارات المباشر (Context Menu) ---
 @bot.tree.context_menu(name="Translate to My Language")
 async def translate_message(interaction: discord.Interaction, message: discord.Message):
