@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import uuid
+from datetime import datetime
 import discord
 import firebase_admin
 from firebase_admin import credentials, db
@@ -9,6 +11,21 @@ from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
 from locales import TRANSLATIONS, get_text
+
+# =========================================================
+# إعداد الثوابت والإعدادات
+# =========================================================
+REQUEST_CHANNEL_ID = int(os.getenv("REQUEST_CHANNEL_ID", "0"))
+
+SUPPORTED_LANGUAGES = ["ar", "en", "es", "ja", "ko", "bg", "vi"]
+
+GENDER_ROLES = ["♂️", "♀️"]
+AGE_ROLES = ["10 - 15", "16 - 20", "21 - 25", "26 - 30", "31 - 40", "40+"]
+COUNTRY_CODES = [
+    "🇾🇪", "🇸🇦", "🇪🇬", "🇩🇿", "🇵🇸", "🇦🇪", "🇮🇶", "🇲🇦", "🇹🇳", "🇯🇴",
+    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🇧🇬", "🇻🇳", "🌐", "OTHER"
+]
+COUNTRY_ROLES = [code for code in COUNTRY_CODES if code != "OTHER"]
 
 # =========================================================
 # إعداد Firebase Realtime Database
@@ -87,12 +104,44 @@ def update_user_field(user_id, field, value):
     except Exception as e:
         print(f"❌ Error updating Firebase data: {e}")
 
+# --- دمج الوظائف المساعدة للطلبات ---
+def has_pending_request(user_id: int, req_type: str) -> bool:
+    try:
+        ref = db.reference("requests")
+        snapshot = ref.order_by_child("user_id").equal_to(user_id).get()
+        if snapshot:
+            for item in snapshot.values():
+                if item.get("type") == req_type and item.get("status") == "pending":
+                    return True
+        return False
+    except Exception as e:
+        print(f"❌ Error checking pending request: {e}")
+        return False
+
+def create_request_record(req_data: dict):
+    try:
+        ref = db.reference(f"requests/{req_data['request_id']}")
+        ref.set(req_data)
+    except Exception as e:
+        print(f"❌ Error creating request in Firebase: {e}")
+
+def update_request_status(req_id: str, updates: dict):
+    try:
+        ref = db.reference(f"requests/{req_id}")
+        ref.update(updates)
+    except Exception as e:
+        print(f"❌ Error updating request status: {e}")
+
+def get_request_record(req_id: str):
+    try:
+        ref = db.reference(f"requests/{req_id}")
+        return ref.get()
+    except Exception as e:
+        print(f"❌ Error getting request record: {e}")
+        return None
+
 # --- ترجمة النصوص الذكية ---
 def translate_smart_preserve_format(text: str, target_lang: str) -> str:
-    """
-    ترجمة النص سطرًا بسطر للمحافظة على التنسيق والسطور الفارغة.
-    تترجم من أي لغة مصدريّة إلى اللغة المستهدفة.
-    """
     if not text or not text.strip():
         return text
 
@@ -169,15 +218,286 @@ async def assign_profile_role(
             pass
 
 # =========================================================
-# القوائم والواجهات البرمجية
+# Modals (نماذج الأدخال)
 # =========================================================
-GENDER_ROLES = ["♂️", "♀️"]
-AGE_ROLES = ["10 - 15", "16 - 20", "21 - 25", "26 - 30", "31 - 40", "40+"]
-COUNTRY_CODES = [
-    "🇾🇪", "🇸🇦", "🇪🇬", "🇩🇿", "🇵🇸", "🇦🇪", "🇮🇶", "🇲🇦", "🇹🇳", "🇯🇴",
-    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🇧🇬", "🇻🇳", "🌐"
-]
-COUNTRY_ROLES = COUNTRY_CODES
+class RequestLanguageModal(discord.ui.Modal):
+    def __init__(self, user_lang: str):
+        super().__init__(title=get_text(user_lang, "language_request_modal_title"))
+        self.user_lang = user_lang
+        self.requested_lang_input = discord.ui.TextInput(
+            label=get_text(user_lang, "language_request_modal_label"),
+            placeholder=get_text(user_lang, "language_request_modal_ph"),
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.requested_lang_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        req_id = f"lang_{uuid.uuid4().hex[:8]}"
+        user = interaction.user
+        requested_lang = self.requested_lang_input.value.strip()
+
+        # تعيين اللغة مؤقتا لـ en
+        update_user_field(user.id, "language", "en")
+        active_lang = "en"
+
+        req_data = {
+            "request_id": req_id,
+            "type": "language",
+            "user_id": user.id,
+            "user_name": str(user),
+            "requested_value": requested_lang,
+            "temp_lang": active_lang,
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        create_request_record(req_data)
+
+        # إشعار العضو لغة العضو أصبحت en
+        await interaction.response.send_message(
+            get_text(active_lang, "language_request_sent"), ephemeral=True
+        )
+
+        # إرسال إشعار لقناة الإدارة
+        channel = interaction.client.get_channel(REQUEST_CHANNEL_ID)
+        if channel:
+            embed = discord.Embed(
+                title=get_text(active_lang, "admin_lang_req_title"),
+                color=discord.Color.gold()
+            )
+            embed.add_field(name=get_text(active_lang, "admin_field_member"), value=f"{user.mention} ({user.name})", inline=False)
+            embed.add_field(name=get_text(active_lang, "admin_field_user_id"), value=str(user.id), inline=True)
+            embed.add_field(name=get_text(active_lang, "admin_field_req_lang"), value=requested_lang, inline=True)
+            embed.add_field(name=get_text(active_lang, "admin_field_curr_lang"), value="English", inline=True)
+            embed.add_field(name=get_text(active_lang, "admin_field_status"), value=get_text(active_lang, "status_pending_badge"), inline=False)
+            
+            await channel.send(embed=embed, view=AdminRequestView(req_id, "language"))
+
+
+class RequestCountryModal(discord.ui.Modal):
+    def __init__(self, user_lang: str):
+        super().__init__(title=get_text(user_lang, "country_request_modal_title"))
+        self.user_lang = user_lang
+        self.requested_country_input = discord.ui.TextInput(
+            label=get_text(user_lang, "country_request_modal_label"),
+            placeholder=get_text(user_lang, "country_request_modal_ph"),
+            required=True,
+            max_length=60
+        )
+        self.add_item(self.requested_country_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        req_id = f"country_{uuid.uuid4().hex[:8]}"
+        user = interaction.user
+        requested_country = self.requested_country_input.value.strip()
+
+        # تعيين الدولة مؤقتا لـ 🌐
+        update_user_field(user.id, "country", "🌐")
+        await assign_profile_role(interaction, COUNTRY_ROLES, "🌐", discord.Color.from_rgb(46, 204, 113))
+
+        req_data = {
+            "request_id": req_id,
+            "type": "country",
+            "user_id": user.id,
+            "user_name": str(user),
+            "requested_value": requested_country,
+            "temp_country": "🌐",
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        create_request_record(req_data)
+
+        # الإشعار بلغة المستخدم الحالية
+        await interaction.response.send_message(
+            get_text(self.user_lang, "country_request_sent"), ephemeral=True
+        )
+
+        # إرسال إشعار لقناة الإدارة
+        channel = interaction.client.get_channel(REQUEST_CHANNEL_ID)
+        if channel:
+            embed = discord.Embed(
+                title=get_text(self.user_lang, "admin_country_req_title"),
+                color=discord.Color.gold()
+            )
+            embed.add_field(name=get_text(self.user_lang, "admin_field_member"), value=f"{user.mention} ({user.name})", inline=False)
+            embed.add_field(name=get_text(self.user_lang, "admin_field_user_id"), value=str(user.id), inline=True)
+            embed.add_field(name=get_text(self.user_lang, "admin_field_req_country"), value=requested_country, inline=True)
+            embed.add_field(name=get_text(self.user_lang, "admin_field_status"), value=get_text(self.user_lang, "status_pending_badge"), inline=False)
+            
+            await channel.send(embed=embed, view=AdminRequestView(req_id, "country"))
+
+
+class RejectReasonModal(discord.ui.Modal):
+    def __init__(self, req_id: str, req_type: str):
+        super().__init__(title="Reject Request / سبب الرفض")
+        self.req_id = req_id
+        self.req_type = req_type
+        self.reason_input = discord.ui.TextInput(
+            label="Rejection Reason / سبب الرفض",
+            style=discord.TextStyle.paragraph,
+            placeholder="Enter reason here...",
+            required=True,
+            max_length=300
+        )
+        self.add_item(self.reason_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        reason = self.reason_input.value.strip()
+        req = get_request_record(self.req_id)
+        if not req or req.get("status") != "pending":
+            await interaction.response.send_message("❌ Request already processed or invalid.", ephemeral=True)
+            return
+
+        resolved_time = datetime.utcnow().isoformat()
+        update_request_status(self.req_id, {
+            "status": "rejected",
+            "rejection_reason": reason,
+            "resolved_at": resolved_time
+        })
+
+        user_id = req["user_id"]
+        user_prof = get_user_profile(user_id)
+        u_lang = user_prof.get("language", "en")
+
+        # تحديث Embed الإدارة
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_field_at(-1, name=get_text("en", "admin_field_status"), value=f"{get_text('en', 'status_rejected_badge')}\n**Reason:** {reason}", inline=False)
+        await interaction.response.edit_message(embed=embed, view=None)
+
+        # مراسلة العضو بالسبب
+        try:
+            target_user = await interaction.client.fetch_user(user_id)
+            if target_user:
+                msg_key = "lang_req_rejected_dm" if self.req_type == "language" else "country_req_rejected_dm"
+                base_msg = get_text(u_lang, msg_key)
+                await target_user.send(f"{base_msg}\n**{get_text(u_lang, 'rejection_reason_label')}:** {reason}")
+        except Exception as e:
+            print(f"⚠️ Could not send DM to user: {e}")
+
+
+class ApproveCountryModal(discord.ui.Modal):
+    def __init__(self, req_id: str):
+        super().__init__(title="Approve Country / قبول الدولة")
+        self.req_id = req_id
+        self.country_code_input = discord.ui.TextInput(
+            label="Country Code / Emoji (e.g. 🇸🇾)",
+            placeholder="Enter Emoji / Code",
+            required=True,
+            max_length=10
+        )
+        self.add_item(self.country_code_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        country_code = self.country_code_input.value.strip()
+        req = get_request_record(self.req_id)
+        if not req or req.get("status") != "pending":
+            await interaction.response.send_message("❌ Request already processed or invalid.", ephemeral=True)
+            return
+
+        user_id = req["user_id"]
+        update_user_field(user_id, "country", country_code)
+
+        # تحديث الرتب
+        guild = interaction.guild
+        if guild:
+            member = guild.get_member(user_id) or await guild.fetch_member(user_id)
+            if member:
+                temp_role = discord.utils.get(guild.roles, name="🌐")
+                if temp_role and temp_role in member.roles:
+                    try:
+                        await member.remove_roles(temp_role)
+                    except discord.Forbidden:
+                        pass
+                
+                new_role = discord.utils.get(guild.roles, name=country_code)
+                if not new_role:
+                    try:
+                        new_role = await guild.create_role(name=country_code, color=discord.Color.from_rgb(46, 204, 113))
+                    except discord.Forbidden:
+                        pass
+                if new_role and new_role not in member.roles:
+                    try:
+                        await member.add_roles(new_role)
+                    except discord.Forbidden:
+                        pass
+
+        resolved_time = datetime.utcnow().isoformat()
+        update_request_status(self.req_id, {
+            "status": "completed",
+            "completed_at": resolved_time,
+            "assigned_code": country_code
+        })
+
+        user_prof = get_user_profile(user_id)
+        u_lang = user_prof.get("language", "en")
+
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_field_at(-1, name=get_text("en", "admin_field_status"), value=f"{get_text('en', 'status_completed_badge')} ({country_code})", inline=False)
+        await interaction.response.edit_message(embed=embed, view=None)
+
+        try:
+            target_user = await interaction.client.fetch_user(user_id)
+            if target_user:
+                await target_user.send(get_text(u_lang, "country_req_approved_dm"))
+        except Exception as e:
+            print(f"⚠️ Could not send DM to user: {e}")
+
+# =========================================================
+# Views الإدارية والخيارات
+# =========================================================
+class AdminRequestView(discord.ui.View):
+    def __init__(self, req_id: str, req_type: str):
+        super().__init__(timeout=None)
+        self.req_id = req_id
+        self.req_type = req_type
+
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, custom_id="admin_btn_approve")
+    async def approve_click(self, interaction: discord.Interaction, button: discord.ui.Button):
+        req = get_request_record(self.req_id)
+        if not req or req.get("status") != "pending":
+            await interaction.response.send_message("❌ Request already processed or invalid.", ephemeral=True)
+            return
+
+        if self.req_type == "country":
+            await interaction.response.send_modal(ApproveCountryModal(self.req_id))
+        else:
+            # قبول اللغة المباشر بالترميز افتراضي أو تحديث الإدارة
+            # في اللغات يضاف Code معتمد
+            user_id = req["user_id"]
+            # كمثال افترضي سيُحدد الكود عبر تحديث مباشر أو حقل
+            req_value = req["requested_value"].lower()[:2]
+            target_code = req_value if req_value in SUPPORTED_LANGUAGES else "en"
+
+            update_user_field(user_id, "language", target_code)
+            resolved_time = datetime.utcnow().isoformat()
+            update_request_status(self.req_id, {
+                "status": "completed",
+                "completed_at": resolved_time,
+                "assigned_code": target_code
+            })
+
+            embed = interaction.message.embeds[0]
+            embed.color = discord.Color.green()
+            embed.set_field_at(-1, name="Status", value=f"✅ Approved ({target_code})", inline=False)
+            await interaction.response.edit_message(embed=embed, view=None)
+
+            try:
+                target_user = await interaction.client.fetch_user(user_id)
+                if target_user:
+                    await target_user.send(get_text(target_code, "lang_req_approved_dm"))
+            except Exception as e:
+                print(f"⚠️ Could not send DM to user: {e}")
+
+    @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger, custom_id="admin_btn_reject")
+    async def reject_click(self, interaction: discord.Interaction, button: discord.ui.Button):
+        req = get_request_record(self.req_id)
+        if not req or req.get("status") != "pending":
+            await interaction.response.send_message("❌ Request already processed or invalid.", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(RejectReasonModal(self.req_id, self.req_type))
 
 
 class GenderSelect(discord.ui.Select):
@@ -242,8 +562,8 @@ class CountrySelect(discord.ui.Select):
         
         options = [
             discord.SelectOption(
-                label=target_dict.get(code, code),
-                emoji=code,
+                label=target_dict.get(code, code) if code != "OTHER" else get_text(lang, "other_option_label"),
+                emoji="🌐" if code == "OTHER" else code,
                 value=code,
                 default=(current_val == code)
             )
@@ -258,6 +578,16 @@ class CountrySelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         selected_country = self.values[0]
+
+        if selected_country == "OTHER":
+            if has_pending_request(interaction.user.id, "country"):
+                await interaction.response.send_message(
+                    get_text(self.lang, "country_request_pending"), ephemeral=True
+                )
+                return
+            await interaction.response.send_modal(RequestCountryModal(self.lang))
+            return
+
         update_user_field(interaction.user.id, "country", selected_country)
         role_color = discord.Color.from_rgb(46, 204, 113)
 
@@ -328,6 +658,20 @@ class LanguageButtonView(discord.ui.View):
     @discord.ui.button(label="Tiếng Việt", emoji="🇻🇳", style=discord.ButtonStyle.secondary, custom_id="btn_vi")
     async def btn_vi(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_lang_click(interaction, "vi")
+
+    @discord.ui.button(label="Other / أخرى", emoji="🌐", style=discord.ButtonStyle.secondary, custom_id="btn_other_lang")
+    async def btn_other_lang(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_prof = get_user_profile(interaction.user.id)
+        current_user_lang = user_prof.get("language", "en")
+
+        if has_pending_request(interaction.user.id, "language"):
+            await interaction.response.send_message(
+                get_text(current_user_lang, "language_request_pending"), ephemeral=True
+            )
+            return
+
+        await interaction.response.send_modal(RequestLanguageModal(current_user_lang))
+
 
 class ProfileManageView(discord.ui.View):
     def __init__(self, user_lang: str, user_data: dict = None):
@@ -440,13 +784,11 @@ async def quick_translate_prefix(ctx: commands.Context, target_language: str = N
     user_lang = user_info.get("language", "en")
     final_lang = target_language.lower().strip() if target_language else user_lang
 
-    # 1. حذف أمر المستخدم (!t) فوراً لتنظيف القناة
     try:
         await ctx.message.delete()
     except Exception:
         pass
 
-    # التحقق من وجود رد (Reply)
     if not ctx.message.reference or not ctx.message.reference.message_id:
         err = await ctx.send(get_text(user_lang, "reply_error"))
         await err.delete(delay=5)
@@ -465,8 +807,6 @@ async def quick_translate_prefix(ctx: commands.Context, target_language: str = N
 
     try:
         translated_text = translate_smart_preserve_format(target_msg.content, final_lang)
-        
-        # 2. إرسال الترجمة وحذفها تلقائياً بعد 15 ثانية
         translated_msg = await ctx.send(f"🌐 **{final_lang.upper()}:** {translated_text}")
         await translated_msg.delete(delay=15)
 
