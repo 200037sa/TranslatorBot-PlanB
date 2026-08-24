@@ -440,31 +440,40 @@ async def quick_translate_prefix(ctx: commands.Context, target_language: str = N
     user_lang = user_info.get("language", "en")
     final_lang = target_language.lower().strip() if target_language else user_lang
 
-    # التحقق من وجود رد (Reply) على رسالة
+    # 1. حذف أمر المستخدم (!t) فوراً لتنظيف القناة
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+
+    # التحقق من وجود رد (Reply)
     if not ctx.message.reference or not ctx.message.reference.message_id:
-        await ctx.send(get_text(user_lang, "reply_error"), delete_after=5)
+        err = await ctx.send(get_text(user_lang, "reply_error"))
+        await err.delete(delay=5)
         return
 
     try:
-        # جلب الرسالة المردود عليها مباشرة برقم الـ ID
         target_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
     except Exception as e:
         print(f"⚠️ Error fetching target message: {e}")
-        await ctx.send(get_text(user_lang, "reply_error"), delete_after=5)
         return
 
     if not target_msg or not target_msg.content:
-        await ctx.send(get_text(user_lang, "reply_error"), delete_after=5)
+        err = await ctx.send(get_text(user_lang, "reply_error"))
+        await err.delete(delay=5)
         return
 
     try:
         translated_text = translate_smart_preserve_format(target_msg.content, final_lang)
-        # إرسال الرسالة المترجمة بالرد على أمر المستخدم
-        await ctx.reply(translated_text, mention_author=False)
+        
+        # 2. إرسال الترجمة وحذفها تلقائياً بعد 15 ثانية
+        translated_msg = await ctx.send(f"🌐 **{final_lang.upper()}:** {translated_text}")
+        await translated_msg.delete(delay=15)
+
     except Exception as e:
         err_msg = get_text(user_lang, "trans_error")
-        await ctx.send(f"{err_msg} {e}", delete_after=5)
-
+        err = await ctx.send(f"{err_msg} {e}")
+        await err.delete(delay=5)
 
 # --- أمر سياق الخيارات المباشر (Context Menu) ---
 @bot.tree.context_menu(name="Translate to My Language")
