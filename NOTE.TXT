@@ -1,13 +1,15 @@
 تعليمات
-اذا اردت اضافة لغة قم بالتغير في 
+اذا اردت اضافة لغة قم بالتغير في 
 main.py
-    @discord.ui.button(label="English", emoji="🇺🇸", style=discord.ButtonStyle.secondary, custom_id="btn_en")
-    async def btn_en(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_lang_click(interaction, "en")
+    @discord.ui.button(label="English", emoji="🇺🇸", style=discord.ButtonStyle.secondary, custom_id="btn_en")
+    async def btn_en(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_lang_click(interaction, "en")
+
+
 
 COUNTRY_CODES = [
     "🇾🇪", "🇸🇦", "🇪🇬", "🇩🇿", "🇵🇸", "🇦🇪", "🇮🇶", "🇲🇦", "🇹🇳", "🇯🇴",
-    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🌐"
+    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🇧🇬", "🇻🇳", "🌐"
 ]
 
 games.py
@@ -17,7 +19,7 @@ def get_user_lang(user_id: int) -> str:
         ref = db.reference(f"users/{user_id}/language")
         lang = ref.get()
 
-        if lang in ("ar", "en", "es", "ja", "ko"):
+        if lang in ("ar", "en", "es", "ja", "ko", "bg", "vi"):
             return lang
     except Exception as e:
         print(f"⚠️ Error fetching language for {user_id} from Firebase: {e}")
@@ -25,3 +27,58 @@ def get_user_lang(user_id: int) -> str:
     return "en"
 
 locales.py
+SUPPORTED_LANGUAGES = ["ar", "en", "es", "ja", "ko", "bg", "vi"]
+
+    "en": {
+        # --- EN ---
+        "survey_desc": "Please fill out your profile options below:",
+        "lang_title": "🌐 Choose Your Language",
+        "lang_desc": "Select your preferred language to set up your profile & enable instant translation:",
+        "reply_error": "⚠️ Please use the command as a **Reply** to the message you want to translate!",
+        "no_text_error": "⚠️ This message contains no text to translate.",
+        "trans_prefix": "🌐 **Translation to ({lang}):**",
+        "trans_error": "❌ An error occurred during translation:",
+        # --- Profile & Survey ---
+        "title": "📋 Member Profile Setup",
+        "gender_ph": "Select Gender...",
+        "gender_m": "Male ♂️",
+        "gender_f": "Female ♀️",
+        "age_ph": "Select Age Range...",
+        "country_ph": "Select Country...",
+        "saved_gender": "✅ Gender saved and role assigned!",
+        "saved_age": "✅ Age range saved and role assigned!",
+        "saved_country": "✅ Country saved and flag role assigned!",
+        "profile_title": "👤 Your Profile",
+        "profile_desc": "Here are your current profile settings:",
+        "lang_label": "Language",
+        "gender_label": "Gender",
+        "age_label": "Age Range",
+        "country_label": "Country",
+        "edit_btn": "✏️ Edit Profile",
+        "change_lang_btn": "🌐 Change Language Only",
+        "not_set": "Not Set",
+        "countries": {
+            "🇾🇪": "Yemen", "🇸🇦": "Saudi Arabia", "🇪🇬": "Egypt", "🇩🇿": "Algeria",
+            "🇵🇸": "Palestine", "🇦🇪": "UAE", "🇮🇶": "Iraq", "🇲🇦": "Morocco",
+            "🇹🇳": "Tunisia", "🇯🇴": "Jordan", "🇺🇸": "USA", "🇪🇸": "Spain",
+            "🇹🇷": "Turkey", "🇰🇷": "South Korea", "🇯🇵": "Japan", "🇩🇪": "Germany",
+            "🇫🇷": "France", "🇬🇧": "United Kingdom", "🇷🇺": "Russia", "🇨🇳": "China",
+            "🌐": "Other Country"
+        },
+        # --- Games UI & System ---
+        "games_channel_only": "⚠️ Sorry, these commands can only be used in the games channel!",
+        "go_to_games_btn": "🧩 Go to Games Channel",
+        "cant_play_self": "❌ You cannot play against yourself!",
+        "games_menu_title": "🎮 Server Games List",
+        "games_menu_desc": "Welcome to the games section! You can challenge other members using the following commands:",
+        "xo_cmd_desc": "**Usage:** `/xo @User`\n**Description:** Classic Tic-Tac-Toe. Take turns with your opponent to form a line of 3 symbols horizontally, vertically, or diagonally.",
+        "rps_cmd_desc": "**Usage:** `/rps @User`\n**Description:** Secretly pick your choice by pressing buttons. Rock beats Scissors, Scissors beats Paper, and Paper beats Rock.",
+        "c4_cmd_desc": "**Usage:** `/connect4 @User`\n**Description:** Pick a column (1-7) to drop your disc. First player to connect 4 discs in a row wins.",
+        "games_footer": "Note: All commands work exclusively in this channel.",
+        "xo_title": "Tic-Tac-Toe",
+        "rps_title": "Rock Paper Scissors",
+        "c4_title": "Connect Four",
+        "winner": "Winner",
+        "loser": "Loser",
+        "draw": "Draw",
+    },

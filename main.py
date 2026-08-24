@@ -89,27 +89,29 @@ def update_user_field(user_id, field, value):
 
 # --- ترجمة النصوص الذكية ---
 def translate_smart_preserve_format(text: str, target_lang: str) -> str:
-    if not text:
-        return text
-
-    if target_lang == "ar":
+    """
+    ترجمة النص سطرًا بسطر للمحافظة على التنسيق والسطور الفارغة.
+    تترجم من أي لغة مصدريّة إلى اللغة المستهدفة.
+    """
+    if not text or not text.strip():
         return text
 
     translator = GoogleTranslator(source="auto", target=target_lang)
     lines = text.split("\n")
     translated_lines = []
-    arabic_pattern = re.compile(r"[\u0600-\u06FF]")
 
     for line in lines:
-        if not line.strip() or not arabic_pattern.search(line):
+        # إذا كان السطر فارغاً، نحتفظ به كما هو دون ترجمة
+        if not line.strip():
             translated_lines.append(line)
             continue
 
         try:
             translated_line = translator.translate(line)
             translated_lines.append(translated_line)
-        except Exception:
-            translated_lines.append(line)
+        except Exception as e:
+            print(f"⚠️ Translation line error: {e}")
+            translated_lines.append(line)  # في حال حدوث خطأ في سطر معين، يتم إرجاع السطر الأصلي
 
     return "\n".join(translated_lines)
 
@@ -174,7 +176,7 @@ GENDER_ROLES = ["♂️", "♀️"]
 AGE_ROLES = ["10 - 15", "16 - 20", "21 - 25", "26 - 30", "31 - 40", "40+"]
 COUNTRY_CODES = [
     "🇾🇪", "🇸🇦", "🇪🇬", "🇩🇿", "🇵🇸", "🇦🇪", "🇮🇶", "🇲🇦", "🇹🇳", "🇯🇴",
-    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🇧🇬", "🌐"
+    "🇺🇸", "🇪🇸", "🇹🇷", "🇰🇷", "🇯🇵", "🇩🇪", "🇫🇷", "🇬🇧", "🇷🇺", "🇨🇳", "🇧🇬", "🇻🇳", "🌐"
 ]
 COUNTRY_ROLES = COUNTRY_CODES
 
@@ -324,6 +326,9 @@ class LanguageButtonView(discord.ui.View):
     async def btn_bg(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_lang_click(interaction, "bg")
 
+    @discord.ui.button(label="Tiếng Việt", emoji="🇻🇳", style=discord.ButtonStyle.secondary, custom_id="btn_vi")
+    async def btn_vi(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_lang_click(interaction, "vi")
 
 class ProfileManageView(discord.ui.View):
     def __init__(self, user_lang: str, user_data: dict = None):
@@ -429,27 +434,33 @@ async def view_profile(interaction: discord.Interaction):
     )
 
 
-@bot.tree.command(name="t", description="Translate replied message to your set profile language")
-@app_commands.describe(target_language="Language code to translate to (optional)")
-async def quick_translate(interaction: discord.Interaction, target_language: str = None):
+@bot.tree.command(name="t", description="Translate replied message or text to your set profile language")
+@app_commands.describe(
+    text="Text to translate directly (optional if replying to a message)",
+    target_language="Language code to translate to (optional)"
+)
+async def quick_translate(interaction: discord.Interaction, text: str = None, target_language: str = None):
     user_info = get_user_profile(interaction.user.id)
     user_lang = user_info.get("language", "en")
+    final_lang = target_language.lower().strip() if target_language else user_lang
 
-    channel = interaction.channel
-    target_msg = None
+    target_text = text
 
-    if interaction.data.get("resolved", {}).get("messages"):
-        target_msg = list(interaction.data["resolved"]["messages"].values())[0]
+    # إذا لم يكتب المستخدم نصاً مباشراً، نحاول جلب النص من الرسالة المردود عليها
+    if not target_text:
+        channel = interaction.channel
+        try:
+            # البحث عن أحدث رسالة رد للمستخدم في القناة
+            async for msg in channel.history(limit=15):
+                if msg.author.id == interaction.user.id and msg.reference and msg.reference.message_id:
+                    ref_msg = await channel.fetch_message(msg.reference.message_id)
+                    target_text = ref_msg.content
+                    break
+        except Exception as e:
+            print(f"⚠️ Error fetching referenced message: {e}")
 
-    try:
-        async for msg in channel.history(limit=10):
-            if msg.author.id == interaction.user.id and msg.reference and msg.reference.message_id:
-                target_msg = await channel.fetch_message(msg.reference.message_id)
-                break
-    except Exception:
-        pass
-
-    if not target_msg or not target_msg.content:
+    # إذا لم نجد نصاً للترجمة
+    if not target_text:
         await interaction.response.send_message(
             get_text(user_lang, "reply_error"),
             ephemeral=True,
@@ -458,11 +469,9 @@ async def quick_translate(interaction: discord.Interaction, target_language: str
 
     await interaction.response.defer(ephemeral=True)
 
-    final_lang = target_language.lower().strip() if target_language else user_lang
-
     try:
-        translated_text = translate_smart_preserve_format(target_msg.content, final_lang)
-        prefix = get_text(user_lang, "trans_prefix").format(lang=final_lang)
+        translated_text = translate_smart_preserve_format(target_text, final_lang)
+        prefix = get_text(user_lang, "trans_prefix").format(lang=final_lang.upper())
         response_text = f"{prefix}\n\n{translated_text}"
         await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
@@ -485,14 +494,13 @@ async def translate_message(interaction: discord.Interaction, message: discord.M
 
     try:
         translated_text = translate_smart_preserve_format(message.content, target_lang)
-        prefix = get_text(target_lang, "trans_prefix").format(lang=target_lang)
+        prefix = get_text(target_lang, "trans_prefix").format(lang=target_lang.upper())
         response_text = f"{prefix}\n\n{translated_text}"
         await interaction.followup.send(response_text, ephemeral=True)
     except Exception as e:
         err_msg = get_text(target_lang, "trans_error")
         await interaction.followup.send(f"{err_msg} {e}", ephemeral=True)
-
-
+        
 keep_alive()
 
 TOKEN = os.getenv("DISCORD_TOKEN")

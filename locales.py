@@ -2,8 +2,7 @@
 # ملف إدارة النصوص واللغات (i18n)
 # =========================================================
 
-SUPPORTED_LANGUAGES = ["ar", "en", "es", "ja", "ko", "bg"]
-
+SUPPORTED_LANGUAGES = ["ar", "en", "es", "ja", "ko", "bg", "vi"]
 TRANSLATIONS = {
     "ar": {
         # --- AR ---
@@ -323,6 +322,59 @@ TRANSLATIONS = {
         "winner": "Победител",
         "loser": "Губещ",
         "draw": "Равенство",
+    },
+    "vi": {
+        # --- VI ---
+        "survey_desc": "Vui lòng điền thông tin hồ sơ của bạn bên dưới:",
+        "lang_title": "🌐 Chọn ngôn ngữ của bạn",
+        "lang_desc": "Chọn ngôn ngữ ưu tiên để thiết lập hồ sơ và kích hoạt dịch tức thời:",
+        "reply_error": "⚠️ Vui lòng sử dụng lệnh bằng cách **Trả lời (Reply)** tin nhắn bạn muốn dịch!",
+        "no_text_error": "⚠️ Tin nhắn này không chứa văn bản để dịch.",
+        "trans_prefix": "🌐 **Dịch sang ({lang}):**",
+        "trans_error": "❌ Đã xảy ra lỗi trong quá trình dịch:",
+        # --- Profile & Survey ---
+        "title": "📋 Thiết lập hồ sơ thành viên",
+        "gender_ph": "Chọn giới tính...",
+        "gender_m": "Nam ♂️",
+        "gender_f": "Nữ ♀️",
+        "age_ph": "Chọn độ tuổi...",
+        "country_ph": "Chọn quốc gia...",
+        "saved_gender": "✅ Đã lưu giới tính và gán vai trò!",
+        "saved_age": "✅ Đã lưu độ tuổi và gán vai trò!",
+        "saved_country": "✅ Đã lưu quốc gia và gán vai trò cờ!",
+        "profile_title": "👤 Hồ sơ của bạn",
+        "profile_desc": "Đây là cài đặt hồ sơ hiện tại của bạn:",
+        "lang_label": "Ngôn ngữ",
+        "gender_label": "Giới tính",
+        "age_label": "Độ tuổi",
+        "country_label": "Quốc gia",
+        "edit_btn": "✏️ Chỉnh sửa hồ sơ",
+        "change_lang_btn": "🌐 Chỉ đổi ngôn ngữ",
+        "not_set": "Chưa thiết lập",
+        "countries": {
+            "🇾🇪": "Yemen", "🇸🇦": "Ả Rập Xê Út", "🇪🇬": "Ai Cập", "🇩🇿": "Algeria",
+            "🇵🇸": "Palestine", "🇦🇪": "UAE", "🇮🇶": "Iraq", "🇲🇦": "Maroc",
+            "🇹🇳": "Tunisia", "🇯🇴": "Jordan", "🇺🇸": "Mỹ", "🇪🇸": "Tây Ban Nha",
+            "🇹🇷": "Thổ Nhĩ Kỳ", "🇰🇷": "Hàn Quốc", "🇯🇵": "Nhật Bản", "🇩🇪": "Đức",
+            "🇫🇷": "Pháp", "🇬🇧": "Vương quốc Anh", "🇷🇺": "Nga", "🇨🇳": "Trung Quốc",
+            "🇻🇳": "Việt Nam", "🌐": "Quốc gia khác"
+        },
+        # --- Games UI & System ---
+        "games_channel_only": "⚠️ Xin lỗi, các lệnh này chỉ có thể được sử dụng trong kênh trò chơi!",
+        "go_to_games_btn": "🧩 Đi tới kênh trò chơi",
+        "cant_play_self": "❌ Bạn không thể tự chơi với chính mình!",
+        "games_menu_title": "🎮 Danh sách trò chơi trên máy chủ",
+        "games_menu_desc": "Chào mừng đến với mục trò chơi! Bạn có thể thách đấu các thành viên khác bằng các lệnh sau:",
+        "xo_cmd_desc": "**Cách dùng:** `/xo @User`\n**Mô tả:** Trò chơi Cờ caro (Tic-Tac-Toe) kinh điển. Thay phiên nhau xếp 3 ký hiệu theo hàng ngang, dọc hoặc đường chéo để giành chiến thắng.",
+        "rps_cmd_desc": "**Cách dùng:** `/rps @User`\n**Mô tả:** Bí mật chọn lựa bằng cách nhấn nút. Búa đập Kéo, Kéo cắt Bao, và Bao bọc Búa.",
+        "c4_cmd_desc": "**Cách dùng:** `/connect4 @User`\n**Mô tả:** Chọn một cột (1-7) để thả quân cờ. Người chơi đầu tiên nối được 4 quân cờ liên tiếp sẽ thắng.",
+        "games_footer": "Lưu ý: Tất cả các lệnh chỉ hoạt động trong kênh này.",
+        "xo_title": "Cờ caro (Tic-Tac-Toe)",
+        "rps_title": "Oẳn tù tì",
+        "c4_title": "Connect Four",
+        "winner": "Người thắng",
+        "loser": "Người thua",
+        "draw": "Hòa",
     },
 }
 

@@ -51,7 +51,7 @@ def get_user_lang(user_id: int) -> str:
         ref = db.reference(f"users/{user_id}/language")
         lang = ref.get()
 
-        if lang in ("ar", "en", "es", "ja", "ko" , "bg"):
+        if lang in ("ar", "en", "es", "ja", "ko", "bg", "vi"):
             return lang
     except Exception as e:
         print(f"⚠️ Error fetching language for {user_id} from Firebase: {e}")
