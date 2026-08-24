@@ -433,46 +433,39 @@ async def view_profile(interaction: discord.Interaction):
     )
 
 
-# --- أمر السلاش الموحد للترجمة بالرد (Slash Command /t) ---
-@bot.tree.command(name="t", description="Translate replied message to your set language or specified target language")
-@app_commands.describe(
-    target_language="Language code to translate to (e.g. ar, en, ja, es)"
-)
-async def quick_translate(interaction: discord.Interaction, target_language: str = None):
-    user_info = get_user_profile(interaction.user.id)
+# --- الأمر النصي للترجمة بالرد (Prefix Command !t) ---
+@bot.command(name="t")
+async def quick_translate_prefix(ctx: commands.Context, target_language: str = None):
+    user_info = get_user_profile(ctx.author.id)
     user_lang = user_info.get("language", "en")
     final_lang = target_language.lower().strip() if target_language else user_lang
 
-    channel = interaction.channel
-    target_msg = None
-
-    # جلب آخر رسائل في القناة والبحث عن الرسالة التي قام المستخدم بالرد عليها فعلياً
-    try:
-        async for msg in channel.history(limit=10):
-            # نبحث عن آخر رسالة أرسلها المستخدم وتتحوى على الرد (Reply)
-            if msg.author.id == interaction.user.id and msg.reference and msg.reference.message_id:
-                target_msg = await channel.fetch_message(msg.reference.message_id)
-                break
-    except Exception as e:
-        print(f"⚠️ Error fetching reference message: {e}")
-
-    # إذا لم يتم العثور على رسالة مردود عليها
-    if not target_msg or not target_msg.content:
-        await interaction.response.send_message(
-            get_text(user_lang, "reply_error"),
-            ephemeral=True,
-        )
+    # التحقق من وجود رد (Reply) على رسالة
+    if not ctx.message.reference or not ctx.message.reference.message_id:
+        await ctx.send(get_text(user_lang, "reply_error"), delete_after=5)
         return
 
-    await interaction.response.defer(ephemeral=True)
+    try:
+        # جلب الرسالة المردود عليها مباشرة برقم الـ ID
+        target_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+    except Exception as e:
+        print(f"⚠️ Error fetching target message: {e}")
+        await ctx.send(get_text(user_lang, "reply_error"), delete_after=5)
+        return
+
+    if not target_msg or not target_msg.content:
+        await ctx.send(get_text(user_lang, "reply_error"), delete_after=5)
+        return
 
     try:
         translated_text = translate_smart_preserve_format(target_msg.content, final_lang)
-        await interaction.followup.send(translated_text, ephemeral=True)
+        # إرسال الرسالة المترجمة بالرد على أمر المستخدم
+        await ctx.reply(translated_text, mention_author=False)
     except Exception as e:
         err_msg = get_text(user_lang, "trans_error")
-        await interaction.followup.send(f"{err_msg} {e}", ephemeral=True)
-        
+        await ctx.send(f"{err_msg} {e}", delete_after=5)
+
+
 # --- أمر سياق الخيارات المباشر (Context Menu) ---
 @bot.tree.context_menu(name="Translate to My Language")
 async def translate_message(interaction: discord.Interaction, message: discord.Message):
@@ -489,7 +482,6 @@ async def translate_message(interaction: discord.Interaction, message: discord.M
 
     try:
         translated_text = translate_smart_preserve_format(message.content, target_lang)
-        # إرسال النص المترجم مباشرة بدون البادئة
         await interaction.followup.send(translated_text, ephemeral=True)
     except Exception as e:
         err_msg = get_text(target_lang, "trans_error")
