@@ -7,8 +7,7 @@ from datetime import datetime
 import discord
 import firebase_admin
 from firebase_admin import credentials, db
-from deep_translator import MyMemoryTranslator, GoogleTranslator
-from translate import Translator as AltTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator, LingueeTranslator
 from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
@@ -144,47 +143,142 @@ def get_request_record(req_id: str):
 
 # --- ترجمة النصوص الذكية (محدثة) ---
 async def translate_smart_preserve_format(text: str, target_lang: str) -> str:
+    """
+    ترجمة ذكية مع عدة محاولات احتياطية.
+
+    تستخدمها:
+    - Translate to My Language
+    - !t
+    - !t <language_code>
+
+    مهم:
+    بعض خدمات الترجمة قد ترجع رسالة خطأ كنص بدل رفع Exception.
+    لذلك يتم فحص النتيجة قبل اعتبارها ترجمة ناجحة.
+    """
+
     if not text or not text.strip():
         return text
 
-    # قائمة كلمات تحذيرية لنظام الحظر الخاص بجوجل لرفض أي رد وهمي
-    GOOG_ERRORS = ["Error 500", "Server Error", "That’s an error", "Please try again later"]
+    target_lang = target_lang.lower().strip()
 
-    # --- المحاولة الأولى: MyMemory (مستقر جداً وسريع للرسائل القصيرة والطويلة) ---
+    # ---------------------------------------------------------
+    # فحص ما إذا كانت النتيجة عبارة عن رسالة خطأ وليست ترجمة
+    # ---------------------------------------------------------
+    def is_invalid_translation(result: str) -> bool:
+        if not result or not isinstance(result, str):
+            return True
+
+        cleaned = result.strip().lower()
+
+        if not cleaned:
+            return True
+
+        error_patterns = [
+            "error 500",
+            "error 400",
+            "error 401",
+            "error 403",
+            "error 404",
+            "error 429",
+            "server error",
+            "that's an error",
+            "there was an error",
+            "please try again later",
+            "translation unavailable",
+            "internal server error",
+            "service unavailable",
+            "temporarily unavailable",
+            "too many requests",
+            "bad request",
+        ]
+
+        return any(pattern in cleaned for pattern in error_patterns)
+
+    # ---------------------------------------------------------
+    # المحاولة 1: Google Translator
+    # ---------------------------------------------------------
     try:
-        translated = await asyncio.to_thread(
-            lambda: MyMemoryTranslator(source="auto", target=target_lang).translate(text)
+        translated = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: GoogleTranslator(
+                    source="auto",
+                    target=target_lang
+                ).translate(text)
+            ),
+            timeout=15
         )
-        if translated and not any(err in translated for err in GOOG_ERRORS):
-            return translated
+
+        if not is_invalid_translation(translated):
+            return translated.strip()
+
+        print("⚠️ Google returned an invalid/error translation. Trying MyMemory...")
+
     except Exception as e:
-        print(f"⚠️ MyMemory failed: {e}")
+        print(f"⚠️ Google Translator failed: {e}. Trying MyMemory...")
 
-    await asyncio.sleep(0.5)
+    # ---------------------------------------------------------
+    # انتظار بسيط قبل المصدر الثاني
+    # ---------------------------------------------------------
+    await asyncio.sleep(1)
 
-    # --- المحاولة الثانية: AltTranslator (مكتبة translate الخارجية) ---
+    # ---------------------------------------------------------
+    # المحاولة 2: MyMemory Translator
+    # ---------------------------------------------------------
     try:
-        translator = AltTranslator(to_lang=target_lang)
-        translated = await asyncio.to_thread(translator.translate, text)
-        if translated and not any(err in translated for err in GOOG_ERRORS):
-            return translated
-    except Exception as e:
-        print(f"⚠️ AltTranslator failed: {e}")
-
-    await asyncio.sleep(0.5)
-
-    # --- المحاولة الثالثة: GoogleTranslator مع فحص النتيجة ---
-    try:
-        translated = await asyncio.to_thread(
-            lambda: GoogleTranslator(source="auto", target=target_lang).translate(text)
+        translated = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: MyMemoryTranslator(
+                    source="auto",
+                    target=target_lang
+                ).translate(text)
+            ),
+            timeout=15
         )
-        # التأكد من أن جوجل لم يرجع صفحة الخطأ 500 كـ نص
-        if translated and not any(err in translated for err in GOOG_ERRORS):
-            return translated
-    except Exception as e:
-        print(f"⚠️ GoogleTranslator failed: {e}")
 
-    return "⚠️ الترجمة غير متاحة حالياً بسبب ضغط السيرفرات، يرجى المحاولة بعد لحظات."
+        if not is_invalid_translation(translated):
+            return translated.strip()
+
+        print("⚠️ MyMemory returned an invalid/error translation. Retrying Google...")
+
+    except Exception as e:
+        print(f"⚠️ MyMemory Translator failed: {e}. Retrying Google...")
+
+    # ---------------------------------------------------------
+    # انتظار بسيط قبل المحاولة الأخيرة
+    # ---------------------------------------------------------
+    await asyncio.sleep(1)
+
+    # ---------------------------------------------------------
+    # المحاولة 3: Google مرة أخرى
+    # بدون إجبار source=en/ar
+    # ---------------------------------------------------------
+    try:
+        translated = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: GoogleTranslator(
+                    source="auto",
+                    target=target_lang
+                ).translate(text)
+            ),
+            timeout=15
+        )
+
+        if not is_invalid_translation(translated):
+            return translated.strip()
+
+        print("⚠️ Final Google attempt returned an invalid/error translation.")
+
+    except Exception as e:
+        print(f"⚠️ Final Google Translator attempt failed: {e}")
+
+    # ---------------------------------------------------------
+    # فشل جميع المحاولات
+    # ---------------------------------------------------------
+    return (
+        "⚠️ **Translation Unavailable:** "
+        "All translation services are temporarily unavailable. "
+        "Please try again in a few seconds."
+    )
 
 
 
