@@ -6,3 +6,4 @@ pymongo
 motor
 requests
 firebase-admin
+translate

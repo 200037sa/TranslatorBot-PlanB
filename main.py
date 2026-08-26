@@ -7,7 +7,8 @@ from datetime import datetime
 import discord
 import firebase_admin
 from firebase_admin import credentials, db
-from deep_translator import GoogleTranslator, MyMemoryTranslator, LingueeTranslator
+from deep_translator import MyMemoryTranslator, GoogleTranslator
+from translate import Translator as AltTranslator
 from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
@@ -143,51 +144,50 @@ def get_request_record(req_id: str):
 
 # --- ترجمة النصوص الذكية (محدثة) ---
 async def translate_smart_preserve_format(text: str, target_lang: str) -> str:
-    """
-    تحاول الترجمة باستخدام 3 مصادر مختلفة بالتوالي:
-    1. Google Translate
-    2. MyMemory Translator
-    3. Google Translate (بصياغة احتياطية)
-    """
     if not text or not text.strip():
         return text
 
-    # المصدر الأول: Google Translate
-    try:
-        translated = await asyncio.to_thread(
-            lambda: GoogleTranslator(source="auto", target=target_lang).translate(text)
-        )
-        if translated:
-            return translated
-    except Exception as e:
-        print(f"⚠️ Source 1 (Google) failed: {e}. Trying Source 2...")
+    # قائمة كلمات تحذيرية لنظام الحظر الخاص بجوجل لرفض أي رد وهمي
+    GOOG_ERRORS = ["Error 500", "Server Error", "That’s an error", "Please try again later"]
 
-    await asyncio.sleep(1) # انتظار ثانية قبل تجربة المصدر الثاني
-
-    # المصدر الثاني: MyMemory Translator
+    # --- المحاولة الأولى: MyMemory (مستقر جداً وسريع للرسائل القصيرة والطويلة) ---
     try:
         translated = await asyncio.to_thread(
             lambda: MyMemoryTranslator(source="auto", target=target_lang).translate(text)
         )
-        if translated:
+        if translated and not any(err in translated for err in GOOG_ERRORS):
             return translated
     except Exception as e:
-        print(f"⚠️ Source 2 (MyMemory) failed: {e}. Trying Source 3...")
+        print(f"⚠️ MyMemory failed: {e}")
 
-    await asyncio.sleep(1) # انتظار ثانية قبل تجربة المصدر الثالث
+    await asyncio.sleep(0.5)
 
-    # المصدر الثالث الاحتياطي: Google مع تحديد المصدر افتراضياً للإنجليزية أو العربية إذا كانت auto سبب المشكلة
+    # --- المحاولة الثانية: AltTranslator (مكتبة translate الخارجية) ---
+    try:
+        translator = AltTranslator(to_lang=target_lang)
+        translated = await asyncio.to_thread(translator.translate, text)
+        if translated and not any(err in translated for err in GOOG_ERRORS):
+            return translated
+    except Exception as e:
+        print(f"⚠️ AltTranslator failed: {e}")
+
+    await asyncio.sleep(0.5)
+
+    # --- المحاولة الثالثة: GoogleTranslator مع فحص النتيجة ---
     try:
         translated = await asyncio.to_thread(
-            lambda: GoogleTranslator(source="en" if target_lang != "en" else "ar", target=target_lang).translate(text)
+            lambda: GoogleTranslator(source="auto", target=target_lang).translate(text)
         )
-        if translated:
+        # التأكد من أن جوجل لم يرجع صفحة الخطأ 500 كـ نص
+        if translated and not any(err in translated for err in GOOG_ERRORS):
             return translated
     except Exception as e:
-        print(f"⚠️ Source 3 failed: {e}")
+        print(f"⚠️ GoogleTranslator failed: {e}")
 
-    # في حال فشل كل المحاولات الثلاث (وهذا نادر جداً)
-    return f"⚠️ **Translation Unavailable:** All translation services are temporarily busy. Please try again in a few seconds."
+    return "⚠️ الترجمة غير متاحة حالياً بسبب ضغط السيرفرات، يرجى المحاولة بعد لحظات."
+
+
+
 
 # --- إدارة الرتب التلقائية ---
 async def assign_profile_role(
