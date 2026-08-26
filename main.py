@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import asyncio
 import uuid
 from datetime import datetime
 import discord
@@ -140,28 +141,33 @@ def get_request_record(req_id: str):
         print(f"❌ Error getting request record: {e}")
         return None
 
-# --- ترجمة النصوص الذكية ---
-def translate_smart_preserve_format(text: str, target_lang: str) -> str:
+# --- ترجمة النصوص الذكية (محدثة) ---
+async def translate_smart_preserve_format(text: str, target_lang: str) -> str:
+    """
+    ترجمة النص بالكامل دفعة واحدة للمحافظة على السياق والكلمات المخلوطة،
+    مع نظام محاولات تلقائي لتجنب أخطاء 500 (Server Error).
+    """
     if not text or not text.strip():
         return text
 
     translator = GoogleTranslator(source="auto", target=target_lang)
-    lines = text.split("\n")
-    translated_lines = []
+    max_retries = 3 # عدد محاولات إعادة الترجمة في حال وجود خطأ 500
 
-    for line in lines:
-        if not line.strip():
-            translated_lines.append(line)
-            continue
-
+    for attempt in range(max_retries):
         try:
-            translated_line = translator.translate(line)
-            translated_lines.append(translated_line)
+            # استخدام to_thread لمنع تجميد البوت لباقي الأعضاء أثناء الترجمة
+            translated_text = await asyncio.to_thread(translator.translate, text)
+            return translated_text
+            
         except Exception as e:
-            print(f"⚠️ Translation line error: {e}")
-            translated_lines.append(line)
+            print(f"⚠️ Translation attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1.5) # انتظار ثانية ونصف قبل المحاولة مرة أخرى
+            else:
+                # إذا فشلت كل المحاولات، نُعلم المستخدم بلطف بدلاً من تجاهل الأمر
+                return f"⚠️ **Server Error:** Could not translate right now. Please try again later.\n\n{text}"
 
-    return "\n".join(translated_lines)
+
 
 # --- إدارة الرتب التلقائية ---
 async def assign_profile_role(
@@ -806,8 +812,8 @@ async def quick_translate_prefix(ctx: commands.Context, target_language: str = N
         return
 
     try:
-        translated_text = translate_smart_preserve_format(target_msg.content, final_lang)
-        translated_msg = await ctx.send(f"🌐 **{final_lang.upper()}:** {translated_text}")
+        translated_text = await translate_smart_preserve_format(target_msg.content, final_lang)
+        translated_msg = await ctx.send(f"🌐 **{final_lang.upper()}:**\n{translated_text}")
         await translated_msg.delete(delay=15)
 
     except Exception as e:
@@ -830,7 +836,7 @@ async def translate_message(interaction: discord.Interaction, message: discord.M
     await interaction.response.defer(ephemeral=True)
 
     try:
-        translated_text = translate_smart_preserve_format(message.content, target_lang)
+        translated_text = await translate_smart_preserve_format(message.content, target_lang)
         await interaction.followup.send(translated_text, ephemeral=True)
     except Exception as e:
         err_msg = get_text(target_lang, "trans_error")
