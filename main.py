@@ -7,15 +7,15 @@ from datetime import datetime
 import discord
 import firebase_admin
 from firebase_admin import credentials, db
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator, LingueeTranslator
 from discord import app_commands
 from discord.ext import commands
 from keep_alive import keep_alive
 from locales import TRANSLATIONS, get_text
 
-# =========================================================
+# ==========================
 # إعداد الثوابت والإعدادات
-# =========================================================
+# ==========================
 REQUEST_CHANNEL_ID = int(os.getenv("REQUEST_CHANNEL_ID", "0"))
 
 SUPPORTED_LANGUAGES = ["ar", "en", "es", "ja", "ko", "bg", "vi"]
@@ -28,9 +28,9 @@ COUNTRY_CODES = [
 ]
 COUNTRY_ROLES = [code for code in COUNTRY_CODES if code != "OTHER"]
 
-# =========================================================
+# =================================
 # إعداد Firebase Realtime Database
-# =========================================================
+# =================================
 FIREBASE_DB_URL = os.getenv("FIREBASE_DB_URL")
 FIREBASE_CREDENTIALS_RAW = os.getenv("FIREBASE_CREDENTIALS")
 
@@ -48,9 +48,9 @@ if FIREBASE_CREDENTIALS_RAW and FIREBASE_DB_URL:
 else:
     print("⚠️ FIREBASE_CREDENTIALS or FIREBASE_DB_URL not found!")
 
-# =========================================================
+# =============
 # إعداد البوت
-# =========================================================
+# =============
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -144,30 +144,50 @@ def get_request_record(req_id: str):
 # --- ترجمة النصوص الذكية (محدثة) ---
 async def translate_smart_preserve_format(text: str, target_lang: str) -> str:
     """
-    ترجمة النص بالكامل دفعة واحدة للمحافظة على السياق والكلمات المخلوطة،
-    مع نظام محاولات تلقائي لتجنب أخطاء 500 (Server Error).
+    تحاول الترجمة باستخدام 3 مصادر مختلفة بالتوالي:
+    1. Google Translate
+    2. MyMemory Translator
+    3. Google Translate (بصياغة احتياطية)
     """
     if not text or not text.strip():
         return text
 
-    translator = GoogleTranslator(source="auto", target=target_lang)
-    max_retries = 3 # عدد محاولات إعادة الترجمة في حال وجود خطأ 500
+    # المصدر الأول: Google Translate
+    try:
+        translated = await asyncio.to_thread(
+            lambda: GoogleTranslator(source="auto", target=target_lang).translate(text)
+        )
+        if translated:
+            return translated
+    except Exception as e:
+        print(f"⚠️ Source 1 (Google) failed: {e}. Trying Source 2...")
 
-    for attempt in range(max_retries):
-        try:
-            # استخدام to_thread لمنع تجميد البوت لباقي الأعضاء أثناء الترجمة
-            translated_text = await asyncio.to_thread(translator.translate, text)
-            return translated_text
-            
-        except Exception as e:
-            print(f"⚠️ Translation attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                await asyncio.sleep(1.5) # انتظار ثانية ونصف قبل المحاولة مرة أخرى
-            else:
-                # إذا فشلت كل المحاولات، نُعلم المستخدم بلطف بدلاً من تجاهل الأمر
-                return f"⚠️ **Server Error:** Could not translate right now. Please try again later.\n\n{text}"
+    await asyncio.sleep(1) # انتظار ثانية قبل تجربة المصدر الثاني
 
+    # المصدر الثاني: MyMemory Translator
+    try:
+        translated = await asyncio.to_thread(
+            lambda: MyMemoryTranslator(source="auto", target=target_lang).translate(text)
+        )
+        if translated:
+            return translated
+    except Exception as e:
+        print(f"⚠️ Source 2 (MyMemory) failed: {e}. Trying Source 3...")
 
+    await asyncio.sleep(1) # انتظار ثانية قبل تجربة المصدر الثالث
+
+    # المصدر الثالث الاحتياطي: Google مع تحديد المصدر افتراضياً للإنجليزية أو العربية إذا كانت auto سبب المشكلة
+    try:
+        translated = await asyncio.to_thread(
+            lambda: GoogleTranslator(source="en" if target_lang != "en" else "ar", target=target_lang).translate(text)
+        )
+        if translated:
+            return translated
+    except Exception as e:
+        print(f"⚠️ Source 3 failed: {e}")
+
+    # في حال فشل كل المحاولات الثلاث (وهذا نادر جداً)
+    return f"⚠️ **Translation Unavailable:** All translation services are temporarily busy. Please try again in a few seconds."
 
 # --- إدارة الرتب التلقائية ---
 async def assign_profile_role(
@@ -223,9 +243,9 @@ async def assign_profile_role(
         except discord.Forbidden:
             pass
 
-# =========================================================
+# =======================
 # Modals (نماذج الأدخال)
-# =========================================================
+# =======================
 class RequestLanguageModal(discord.ui.Modal):
     def __init__(self, user_lang: str):
         super().__init__(title=get_text(user_lang, "language_request_modal_title"))
@@ -259,7 +279,6 @@ class RequestLanguageModal(discord.ui.Modal):
         }
         create_request_record(req_data)
 
-        # إشعار العضو لغة العضو أصبحت en
         await interaction.response.send_message(
             get_text(active_lang, "language_request_sent"), ephemeral=True
         )
@@ -450,9 +469,9 @@ class ApproveCountryModal(discord.ui.Modal):
         except Exception as e:
             print(f"⚠️ Could not send DM to user: {e}")
 
-# =========================================================
+# =========================
 # Views الإدارية والخيارات
-# =========================================================
+# =========================
 class AdminRequestView(discord.ui.View):
     def __init__(self, req_id: str, req_type: str):
         super().__init__(timeout=None)
@@ -469,10 +488,7 @@ class AdminRequestView(discord.ui.View):
         if self.req_type == "country":
             await interaction.response.send_modal(ApproveCountryModal(self.req_id))
         else:
-            # قبول اللغة المباشر بالترميز افتراضي أو تحديث الإدارة
-            # في اللغات يضاف Code معتمد
             user_id = req["user_id"]
-            # كمثال افترضي سيُحدد الكود عبر تحديث مباشر أو حقل
             req_value = req["requested_value"].lower()[:2]
             target_code = req_value if req_value in SUPPORTED_LANGUAGES else "en"
 
@@ -715,9 +731,9 @@ class ProfileManageView(discord.ui.View):
             embed=embed, view=LanguageButtonView(current_lang=self.user_lang), ephemeral=True
         )
 
-# =========================================================
+# ================
 # الأحداث والأوامر
-# =========================================================
+# ================
 @bot.event
 async def on_ready():
     try:
